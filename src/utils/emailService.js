@@ -3,10 +3,15 @@ const EmailLog = require('../models/EmailLog');
 
 // Configure the transporter
 const transporter = nodemailer.createTransport({
-  service: 'gmail',
+  host: 'smtp.gmail.com',
+  port: 465,
+  secure: true,
   auth: {
     user: 'globalinfotechindia07@gmail.com',
     pass: 'milp oeru ubrf grtm'
+  },
+  tls: {
+    rejectUnauthorized: false
   }
 });
 
