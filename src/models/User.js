@@ -36,13 +36,17 @@ const userSchema = mongoose.Schema({
       return this.role === 'User';
     }
   },
-  teamHead: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    required: function() {
-      return this.role === 'User';
+    teamHead: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      required: function() {
+        return this.role === 'User';
+      }
+    },
+    pushSubscriptions: {
+      type: Array,
+      default: []
     }
-  }
 }, { timestamps: true });
 
 // Hash password before saving

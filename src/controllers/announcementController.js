@@ -1,6 +1,7 @@
 const Announcement = require('../models/Announcement');
 const User = require('../models/User');
 const { sendAnnouncementEmail } = require('../utils/emailService');
+const { sendNotificationToUser } = require('../utils/pushService');
 
 // @desc    Get all announcements
 // @route   GET /api/announcements
@@ -38,9 +39,20 @@ const createAnnouncement = async (req, res) => {
     await createdAnnouncement.populate('createdBy', 'name role');
     
     // Fetch all users to send the announcement
-    const allUsers = await User.find({}).select('email');
+    const allUsers = await User.find({}).select('email pushSubscriptions');
     sendAnnouncementEmail(createdAnnouncement, allUsers).catch(err => {
       console.error('Failed to send announcement emails:', err);
+    });
+    
+    // Send push notifications
+    allUsers.forEach(u => {
+      if (u._id.toString() !== req.user._id.toString()) {
+        sendNotificationToUser(u, {
+          title: 'New Announcement',
+          body: createdAnnouncement.title,
+          url: '/'
+        }).catch(err => console.error('Failed to send push notification:', err));
+      }
     });
     
     res.status(201).json(createdAnnouncement);

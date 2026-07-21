@@ -1,6 +1,7 @@
 const Task = require('../models/Task');
 const User = require('../models/User');
 const { sendTaskAssignmentEmail } = require('../utils/emailService');
+const { sendNotificationToUser } = require('../utils/pushService');
 
 // @desc    Get all tasks (with filters)
 // @route   GET /api/tasks
@@ -72,6 +73,12 @@ const createTask = async (req, res) => {
       sendTaskAssignmentEmail(createdTask, assignedUser, req.user).catch(err => {
         console.error('Failed to send task assignment email:', err);
       });
+      // Send push notification
+      sendNotificationToUser(assignedUser, {
+        title: 'New Task Assigned',
+        body: `${req.user.name} assigned you a new task: ${createdTask.title}`,
+        url: '/user/tasks'
+      }).catch(err => console.error('Failed to send push notification:', err));
     }
 
     res.status(201).json(createdTask);
