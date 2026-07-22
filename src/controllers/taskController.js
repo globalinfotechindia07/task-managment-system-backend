@@ -14,9 +14,17 @@ const getTasks = async (req, res) => {
     if (req.user.role === 'User') {
       filter.assignedTo = req.user._id;
     } else if (req.user.role === 'Team Head') {
-      // Team Head sees tasks assigned by them or to them (or logic specific to team head)
-      // For now, let's keep it simple: if not Admin/HR, see your own stuff
-      filter.$or = [{ assignedTo: req.user._id }, { assignedBy: req.user._id }];
+      // Find all users who report to this Team Head
+      const teamMembers = await User.find({ teamHead: req.user._id }).select('_id');
+      const teamMemberIds = teamMembers.map(member => member._id);
+      
+      // Also include the team head themselves just in case they have their own tasks
+      teamMemberIds.push(req.user._id);
+
+      filter.$or = [
+        { assignedTo: { $in: teamMemberIds } },
+        { assignedBy: req.user._id }
+      ];
     }
 
     // Admins see everything.

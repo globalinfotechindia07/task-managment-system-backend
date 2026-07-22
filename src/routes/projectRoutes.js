@@ -1,4 +1,4 @@
-﻿const express = require('express');
+const express = require('express');
 const router = express.Router();
 const {
   getProjects,
@@ -9,7 +9,7 @@ const {
 const { protect, authorizeRoles } = require('../middleware/authMiddleware');
 
 router.route('/')
-  .get(protect, authorizeRoles('Admin'), getProjects)
+  .get(protect, authorizeRoles('Admin', 'Team Head'), getProjects)
   .post(protect, authorizeRoles('Admin'), createProject);
 
 router.route('/:id')
