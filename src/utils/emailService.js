@@ -3,12 +3,13 @@ const EmailLog = require('../models/EmailLog');
 
 // Configure the transporter
 const transporter = nodemailer.createTransport({
-  host: 'smtp.gmail.com',
-  port: 465,
+  host: process.env.SMTP_HOST || 'smtp.gmail.com',
+  port: process.env.SMTP_PORT || 465,
   secure: true,
   auth: {
-    user: 'globalinfotechindia07@gmail.com',
-    pass: 'milp oeru ubrf grtm'
+    user: process.env.SMTP_USER || 'globalinfotechindia07@gmail.com',
+    // It's highly recommended to use environment variables because GitHub revokes exposed App Passwords
+    pass: process.env.SMTP_PASS || 'milp oeru ubrf grtm'
   },
   tls: {
     rejectUnauthorized: false

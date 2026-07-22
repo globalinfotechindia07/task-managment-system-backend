@@ -87,7 +87,13 @@ const updateUser = async (req, res) => {
       
       if (user.role === 'User') {
         user.department = req.body.department || user.department;
-        user.teamHead = req.body.teamHead || user.teamHead;
+        
+        // Handle teamHead if it's sent as a populated object
+        let th = req.body.teamHead;
+        if (th && typeof th === 'object' && th._id) {
+            th = th._id;
+        }
+        user.teamHead = th || user.teamHead;
       } else {
         user.department = undefined;
         user.teamHead = undefined;
