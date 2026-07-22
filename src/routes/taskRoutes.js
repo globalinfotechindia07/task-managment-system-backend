@@ -8,7 +8,8 @@ const {
   updateTask, 
   addComment,
   getTaskById,
-  deleteTask
+  deleteTask,
+  addDailyReport
 } = require('../controllers/taskController');
 const { protect } = require('../middleware/authMiddleware');
 
@@ -23,16 +24,18 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage });
 
+router.use(protect);
+
 router.route('/')
-  .get(protect, getTasks)
-  .post(protect, upload.array('attachments', 5), createTask);
+  .get(getTasks)
+  .post(upload.array('attachments', 5), createTask);
 
 router.route('/:id')
-  .get(protect, getTaskById)
-  .put(protect, upload.array('attachments', 5), updateTask)
-  .delete(protect, deleteTask);
+  .get(getTaskById)
+  .put(upload.array('attachments', 5), updateTask)
+  .delete(deleteTask);
 
-router.route('/:id/comments')
-  .post(protect, addComment);
+router.post('/:id/comments', addComment);
+router.post('/:id/reports', addDailyReport);
 
 module.exports = router;

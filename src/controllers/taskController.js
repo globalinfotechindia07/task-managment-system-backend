@@ -22,6 +22,7 @@ const getTasks = async (req, res) => {
     // Admins see everything.
 
     let tasks = await Task.find(filter)
+      .populate('project', 'name status')
       .populate('assignedTo', 'name email role')
       .populate('assignedBy', 'name email role')
       .sort({ createdAt: -1 });
@@ -42,7 +43,7 @@ const getTasks = async (req, res) => {
 const createTask = async (req, res) => {
   try {
     const { 
-      title, description, assignedTo, startDate, dueDate, 
+      title, description, project, assignedTo, startDate, dueDate, 
       estimatedTimeDuration, priority, status 
     } = req.body;
 
@@ -55,6 +56,7 @@ const createTask = async (req, res) => {
     const task = new Task({
       title,
       description,
+      project,
       assignedTo,
       assignedBy: req.user._id,
       startDate: adjustedStartDate,
@@ -183,9 +185,11 @@ const addComment = async (req, res) => {
 const getTaskById = async (req, res) => {
   try {
     const task = await Task.findById(req.params.id)
+      .populate('project', 'name status')
       .populate('assignedTo', 'name email role')
       .populate('assignedBy', 'name email role')
       .populate('comments.user', 'name role')
+      .populate('reports.user', 'name role')
       .populate('history.user', 'name role');
 
     if (task) {
@@ -221,11 +225,52 @@ const deleteTask = async (req, res) => {
   }
 };
 
+// @desc    Add a daily report to a task
+// @route   POST /api/tasks/:id/reports
+// @access  Private (Assigned User)
+const addDailyReport = async (req, res) => {
+  try {
+    const { description } = req.body;
+    const task = await Task.findById(req.params.id);
+
+    if (task) {
+      // Allow assigned user to add a report
+      if (task.assignedTo.toString() !== req.user._id.toString()) {
+        return res.status(403).json({ message: 'Only the assigned user can submit daily reports for this task' });
+      }
+
+      if (!description) {
+        return res.status(400).json({ message: 'Description is required for a daily report' });
+      }
+
+      const report = {
+        description,
+        user: req.user._id,
+      };
+
+      task.reports.push(report);
+      task.history.push({
+        action: 'Daily report submitted',
+        user: req.user._id
+      });
+
+      const updatedTask = await task.save();
+      await updatedTask.populate('reports.user', 'name role');
+      res.json(updatedTask);
+    } else {
+      res.status(404).json({ message: 'Task not found' });
+    }
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 module.exports = {
   getTasks,
   createTask,
   updateTask,
   addComment,
   getTaskById,
-  deleteTask
+  deleteTask,
+  addDailyReport
 };

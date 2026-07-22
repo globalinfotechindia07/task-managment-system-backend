@@ -17,7 +17,6 @@ const userSchema = mongoose.Schema({
   },
   role: {
     type: String,
-    enum: ['Admin', 'Team Head', 'User', 'HR Manager'],
     required: true,
   },
   designation: {
@@ -31,7 +30,6 @@ const userSchema = mongoose.Schema({
   },
   department: {
     type: String,
-    enum: ['IT', 'Marketing'],
     required: function() {
       return this.role === 'User';
     }
@@ -46,6 +44,16 @@ const userSchema = mongoose.Schema({
     pushSubscriptions: {
       type: Array,
       default: []
+    },
+    requiresPasswordChange: {
+      type: Boolean,
+      default: true
+    },
+    phone: {
+      type: String
+    },
+    profilePicture: {
+      type: String
     }
 }, { timestamps: true });
 

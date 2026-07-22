@@ -9,6 +9,11 @@ const taskSchema = mongoose.Schema({
     type: String,
     required: true,
   },
+  project: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Project',
+    required: true,
+  },
   status: {
     type: String,
     enum: ['Pending', 'In Progress', 'Completed', 'On Hold'],
@@ -48,6 +53,11 @@ const taskSchema = mongoose.Schema({
   }],
   history: [{
     action: { type: String, required: true }, // e.g., 'Status updated to In Progress', 'Priority changed to High'
+    user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    createdAt: { type: Date, default: Date.now }
+  }],
+  reports: [{
+    description: { type: String, required: true },
     user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
     createdAt: { type: Date, default: Date.now }
   }]
