@@ -2,6 +2,7 @@ const Task = require('../models/Task');
 const User = require('../models/User');
 const { sendTaskAssignmentEmail } = require('../utils/emailService');
 const { sendNotificationToUser } = require('../utils/pushService');
+const { calculateTaskDueDate, adjustToWorkingHours } = require('../utils/timeCalculator');
 
 // @desc    Get all tasks (with filters)
 // @route   GET /api/tasks
@@ -47,13 +48,17 @@ const createTask = async (req, res) => {
 
     const attachments = req.files ? req.files.map(file => `/uploads/${file.filename}`) : [];
 
+    // Adjust start date to working hours and calculate due date automatically
+    const adjustedStartDate = adjustToWorkingHours(startDate || new Date());
+    const calculatedDueDate = estimatedTimeDuration ? calculateTaskDueDate(adjustedStartDate, estimatedTimeDuration) : dueDate;
+
     const task = new Task({
       title,
       description,
       assignedTo,
       assignedBy: req.user._id,
-      startDate,
-      dueDate,
+      startDate: adjustedStartDate,
+      dueDate: calculatedDueDate,
       estimatedTimeDuration,
       priority,
       status: status || 'Pending',
@@ -107,6 +112,14 @@ const updateTask = async (req, res) => {
           task[field] = updates[field];
         }
       });
+
+      // Recalculate working hours logic if relevant fields changed
+      if (updates.startDate || updates.estimatedTimeDuration) {
+        task.startDate = adjustToWorkingHours(task.startDate);
+        if (task.estimatedTimeDuration) {
+          task.dueDate = calculateTaskDueDate(task.startDate, task.estimatedTimeDuration);
+        }
+      }
 
       if (req.files && req.files.length > 0) {
         const newAttachments = req.files.map(file => `/uploads/${file.filename}`);
@@ -185,10 +198,34 @@ const getTaskById = async (req, res) => {
   }
 };
 
+// @desc    Delete a task
+// @route   DELETE /api/tasks/:id
+// @access  Private (Admin or Team Head who created it)
+const deleteTask = async (req, res) => {
+  try {
+    const task = await Task.findById(req.params.id);
+
+    if (task) {
+      // Check authorization
+      if (req.user.role !== 'Admin' && task.assignedBy.toString() !== req.user._id.toString()) {
+        return res.status(403).json({ message: 'Not authorized to delete this task' });
+      }
+
+      await Task.findByIdAndDelete(req.params.id);
+      res.json({ message: 'Task removed successfully' });
+    } else {
+      res.status(404).json({ message: 'Task not found' });
+    }
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 module.exports = {
   getTasks,
   createTask,
   updateTask,
   addComment,
-  getTaskById
+  getTaskById,
+  deleteTask
 };

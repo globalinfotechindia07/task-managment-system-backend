@@ -7,7 +7,8 @@ const {
   createTask, 
   updateTask, 
   addComment,
-  getTaskById
+  getTaskById,
+  deleteTask
 } = require('../controllers/taskController');
 const { protect } = require('../middleware/authMiddleware');
 
@@ -28,7 +29,8 @@ router.route('/')
 
 router.route('/:id')
   .get(protect, getTaskById)
-  .put(protect, upload.array('attachments', 5), updateTask);
+  .put(protect, upload.array('attachments', 5), updateTask)
+  .delete(protect, deleteTask);
 
 router.route('/:id/comments')
   .post(protect, addComment);

@@ -118,4 +118,26 @@ const updateUser = async (req, res) => {
   }
 };
 
-module.exports = { getUsers, createUser, updateUser };
+// @desc    Delete user
+// @route   DELETE /api/users/:id
+// @access  Private/Admin
+const deleteUser = async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id);
+
+    if (user) {
+      if (user.role === 'Admin') {
+        return res.status(403).json({ message: 'Cannot delete an Admin user' });
+      }
+      
+      await User.findByIdAndDelete(req.params.id);
+      res.json({ message: 'User removed successfully' });
+    } else {
+      res.status(404).json({ message: 'User not found' });
+    }
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+module.exports = { getUsers, createUser, updateUser, deleteUser };
