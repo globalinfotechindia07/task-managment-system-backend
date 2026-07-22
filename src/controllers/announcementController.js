@@ -22,7 +22,7 @@ const getAnnouncements = async (req, res) => {
 // @access  Private/HR Manager & Admin
 const createAnnouncement = async (req, res) => {
   try {
-    const { title, content, priority, scheduledDate } = req.body;
+    const { title, content, priority, scheduledDate, expireDate } = req.body;
 
     const attachments = req.files ? req.files.map(file => `/uploads/${file.filename}`) : [];
 
@@ -31,6 +31,7 @@ const createAnnouncement = async (req, res) => {
       content,
       priority,
       scheduledDate,
+      expireDate,
       attachments,
       createdBy: req.user._id
     });
@@ -98,12 +99,13 @@ const updateAnnouncement = async (req, res) => {
        return res.status(403).json({ message: 'Not authorized to update this announcement' });
     }
 
-    const { title, content, priority, scheduledDate } = req.body;
+    const { title, content, priority, scheduledDate, expireDate } = req.body;
     
     announcement.title = title || announcement.title;
     announcement.content = content || announcement.content;
     announcement.priority = priority || announcement.priority;
     if (scheduledDate) announcement.scheduledDate = scheduledDate;
+    if (expireDate !== undefined) announcement.expireDate = expireDate || undefined;
 
     if (req.files && req.files.length > 0) {
       const newAttachments = req.files.map(file => `/uploads/${file.filename}`);

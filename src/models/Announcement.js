@@ -22,6 +22,9 @@ const announcementSchema = new mongoose.Schema({
     type: Date,
     default: Date.now
   },
+  expireDate: {
+    type: Date
+  },
   createdBy: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
