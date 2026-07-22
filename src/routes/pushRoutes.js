@@ -18,12 +18,13 @@ router.post('/subscribe', async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    // Check if subscription already exists to avoid duplicates
-    const existingSub = user.pushSubscriptions.find(sub => sub.endpoint === subscription.endpoint);
+    const existingSub = user.pushSubscriptions && user.pushSubscriptions.find(sub => sub.endpoint === subscription.endpoint);
     
     if (!existingSub) {
-      user.pushSubscriptions.push(subscription);
-      await user.save();
+      await User.updateOne(
+        { _id: userId },
+        { $push: { pushSubscriptions: subscription } }
+      );
     }
 
     res.status(201).json({ message: 'Subscribed to push notifications successfully' });
