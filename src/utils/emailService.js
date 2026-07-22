@@ -4,11 +4,10 @@ const EmailLog = require('../models/EmailLog');
 // Configure the transporter
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST || 'smtp.gmail.com',
-  port: process.env.SMTP_PORT || 465,
-  secure: true,
+  port: process.env.SMTP_PORT || 587,
+  secure: false,
   auth: {
     user: process.env.SMTP_USER || 'globalinfotechindia07@gmail.com',
-    // It's highly recommended to use environment variables because GitHub revokes exposed App Passwords
     pass: process.env.SMTP_PASS || 'milp oeru ubrf grtm'
   },
   tls: {
@@ -101,7 +100,7 @@ const sendAnnouncementEmail = async (announcement, users) => {
   if (!users || users.length === 0) return;
 
   const subject = `Company Announcement: ${announcement.title}`;
-  
+
   const attachmentsHtml = announcement.attachments && announcement.attachments.length > 0
     ? `<p style="font-size: 13px; color: #64748b; margin-top: 20px;"><em>This announcement includes attached files. Please log in to view them.</em></p>`
     : '';
