@@ -26,6 +26,7 @@ app.use('/api/announcements', require('./routes/announcementRoutes'));
 app.use('/api/push', require('./routes/pushRoutes'));
 app.use('/api/settings', require('./routes/settingsRoutes'));
 app.use('/api/projects', require('./routes/projectRoutes'));
+app.use('/api/notifications', require('./routes/notificationRoutes'));
 
 // Serve static files for uploads
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
@@ -40,6 +41,15 @@ app.use((err, req, res, next) => {
   });
 });
 
+const http = require('http');
+const { initSocket } = require('./utils/socketService');
+
+// Create HTTP server
+const server = http.createServer(app);
+
+// Initialize Socket.IO
+initSocket(server);
+
 const PORT = process.env.PORT || 5000;
 
-app.listen(PORT, () => console.log(`Server started on port ${PORT}`));
+server.listen(PORT, () => console.log(`Server started on port ${PORT}`));

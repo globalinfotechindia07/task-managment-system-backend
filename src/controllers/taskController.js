@@ -3,6 +3,8 @@ const User = require('../models/User');
 const { sendTaskAssignmentEmail } = require('../utils/emailService');
 const { sendNotificationToUser } = require('../utils/pushService');
 const { calculateTaskDueDate, adjustToWorkingHours } = require('../utils/timeCalculator');
+const { sendRealTimeNotification, emitTaskUpdate } = require('../utils/socketService');
+const Notification = require('../models/Notification');
 
 // @desc    Get all tasks (with filters)
 // @route   GET /api/tasks
@@ -94,6 +96,21 @@ const createTask = async (req, res) => {
         body: `${req.user.name} assigned you a new task: ${createdTask.title}`,
         url: '/user/tasks'
       }).catch(err => console.error('Failed to send push notification:', err));
+
+      // Save Notification to DB
+      const newNotif = await Notification.create({
+        user: assignedTo,
+        title: 'New Task Assigned',
+        message: `${req.user.name} assigned you a new task: ${createdTask.title}`,
+        type: 'task_assigned',
+        link: '/user/tasks'
+      });
+
+      // Emit Socket.IO real-time notification
+      sendRealTimeNotification(assignedTo, newNotif);
+      
+      // Emit task update so task lists auto-refresh
+      emitTaskUpdate([assignedTo, req.user._id], 'task_created', createdTask);
     }
 
     res.status(201).json(createdTask);
@@ -143,6 +160,26 @@ const updateTask = async (req, res) => {
       if (historyLog.length > 0) {
         task.history.push(...historyLog);
         const updatedTask = await task.save();
+        await updatedTask.populate('assignedTo assignedBy project');
+        
+        // Notify the relevant party if status was updated
+        if (updates.status) {
+          const notifyUserId = req.user._id.toString() === updatedTask.assignedTo._id.toString() 
+            ? updatedTask.assignedBy._id 
+            : updatedTask.assignedTo._id;
+
+          const newNotif = await Notification.create({
+            user: notifyUserId,
+            title: 'Task Status Updated',
+            message: `Task "${updatedTask.title}" status changed to ${updates.status} by ${req.user.name}`,
+            type: 'task_updated',
+          });
+          sendRealTimeNotification(notifyUserId, newNotif);
+        }
+
+        // Always emit task update to both assigner and assignee to keep views in sync
+        emitTaskUpdate([updatedTask.assignedTo._id, updatedTask.assignedBy._id], 'task_updated', updatedTask);
+        
         res.json(updatedTask);
       } else {
         res.json(task);
@@ -178,6 +215,24 @@ const addComment = async (req, res) => {
       const updatedTask = await task.save();
       // Populate user info before returning
       await updatedTask.populate('comments.user', 'name role');
+      await updatedTask.populate('assignedTo assignedBy');
+
+      // Send notification to the other party
+      const notifyUserId = req.user._id.toString() === updatedTask.assignedTo._id.toString() 
+          ? updatedTask.assignedBy._id 
+          : updatedTask.assignedTo._id;
+      
+      const newNotif = await Notification.create({
+        user: notifyUserId,
+        title: 'New Comment',
+        message: `${req.user.name} commented on "${updatedTask.title}"`,
+        type: 'comment_added'
+      });
+      sendRealTimeNotification(notifyUserId, newNotif);
+
+      // Emit task update for real-time comment showing
+      emitTaskUpdate([updatedTask.assignedTo._id, updatedTask.assignedBy._id], 'task_updated', updatedTask);
+
       res.json(updatedTask);
     } else {
       res.status(404).json({ message: 'Task not found' });
@@ -264,6 +319,20 @@ const addDailyReport = async (req, res) => {
 
       const updatedTask = await task.save();
       await updatedTask.populate('reports.user', 'name role');
+      await updatedTask.populate('assignedTo assignedBy');
+
+      // Notify Assigner (Admin/Team Head)
+      const newNotif = await Notification.create({
+        user: updatedTask.assignedBy._id,
+        title: 'Daily Report Submitted',
+        message: `${req.user.name} submitted a daily report for "${updatedTask.title}"`,
+        type: 'report_added'
+      });
+      sendRealTimeNotification(updatedTask.assignedBy._id, newNotif);
+
+      // Emit task update
+      emitTaskUpdate([updatedTask.assignedTo._id, updatedTask.assignedBy._id], 'task_updated', updatedTask);
+
       res.json(updatedTask);
     } else {
       res.status(404).json({ message: 'Task not found' });
