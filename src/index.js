@@ -27,6 +27,7 @@ app.use('/api/push', require('./routes/pushRoutes'));
 app.use('/api/settings', require('./routes/settingsRoutes'));
 app.use('/api/projects', require('./routes/projectRoutes'));
 app.use('/api/notifications', require('./routes/notificationRoutes'));
+app.use('/api/chat', require('./routes/chatRoutes'));
 
 // Serve static files for uploads
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));

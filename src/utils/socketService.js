@@ -1,6 +1,8 @@
 const { Server } = require('socket.io');
 const jwt = require('jsonwebtoken');
 
+const ChatGroup = require('../models/ChatGroup');
+
 let io;
 // Keep track of connected users: { userId: socketId }
 const userSockets = new Map();
@@ -20,7 +22,7 @@ const initSocket = (server) => {
     }
 
     try {
-      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback_secret');
+      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'secret123');
       socket.user = decoded;
       next();
     } catch (error) {
@@ -28,19 +30,80 @@ const initSocket = (server) => {
     }
   });
 
-  io.on('connection', (socket) => {
+  io.on('connection', async (socket) => {
     console.log(`User connected: ${socket.user.id} (Socket: ${socket.id})`);
     
     // Store socket mapping
     userSockets.set(socket.user.id, socket.id);
 
-    // Optional: User can join a room based on their ID for easier targeted emitting
+    // Join personal room
     socket.join(socket.user.id);
+
+    // Join group rooms
+    try {
+      const groups = await ChatGroup.find({ members: socket.user.id });
+      groups.forEach(group => {
+        socket.join(`group_${group._id}`);
+      });
+    } catch (err) {
+      console.error('Error joining group rooms:', err);
+    }
 
     socket.on('disconnect', () => {
       console.log(`User disconnected: ${socket.user.id}`);
       userSockets.delete(socket.user.id);
     });
+
+    // ==========================================
+    // WebRTC Signaling for Team Meetings
+    // ==========================================
+
+    socket.on('join-meeting', (roomId, userId) => {
+      socket.join(roomId);
+      // Broadcast to everyone else in the room that a new user joined
+      socket.to(roomId).emit('user-connected', userId);
+
+      socket.on('disconnect', () => {
+        socket.to(roomId).emit('user-disconnected', userId);
+      });
+    });
+
+    socket.on('leave-meeting', (roomId, userId) => {
+      socket.leave(roomId);
+      socket.to(roomId).emit('user-disconnected', userId);
+    });
+
+    socket.on('invite-to-meeting', ({ roomId, fromName, toUserId }) => {
+      const toSocketId = userSockets.get(toUserId);
+      if (toSocketId) {
+        io.to(toSocketId).emit('meeting-invite', { roomId, fromName });
+      }
+    });
+
+    socket.on('offer', (payload) => {
+      // payload: { to: userId, caller: userId, sdp: offer }
+      const toSocketId = userSockets.get(payload.to);
+      if (toSocketId) {
+        io.to(toSocketId).emit('offer', payload);
+      }
+    });
+
+    socket.on('answer', (payload) => {
+      // payload: { to: userId, answer: sdp }
+      const toSocketId = userSockets.get(payload.to);
+      if (toSocketId) {
+        io.to(toSocketId).emit('answer', payload);
+      }
+    });
+
+    socket.on('ice-candidate', (payload) => {
+      // payload: { to: userId, candidate: candidate, from: userId }
+      const toSocketId = userSockets.get(payload.to);
+      if (toSocketId) {
+        io.to(toSocketId).emit('ice-candidate', payload);
+      }
+    });
+    // ==========================================
   });
 
   return io;
@@ -60,6 +123,13 @@ const sendRealTimeNotification = (userId, notification) => {
   }
 };
 
+const sendRealTimeMessage = (id, message, isGroup = false) => {
+  if (io) {
+    const room = isGroup ? `group_${id}` : id.toString();
+    io.to(room).emit('receive_message', message);
+  }
+};
+
 const emitTaskUpdate = (userIds, event, payload) => {
   if (io) {
     userIds.forEach(userId => {
@@ -70,9 +140,17 @@ const emitTaskUpdate = (userIds, event, payload) => {
   }
 };
 
+const emitChatEvent = (userId, event, payload) => {
+  if (io) {
+    io.to(userId.toString()).emit(event, payload);
+  }
+};
+
 module.exports = {
   initSocket,
   getIO,
   sendRealTimeNotification,
-  emitTaskUpdate
+  emitTaskUpdate,
+  sendRealTimeMessage,
+  emitChatEvent
 };

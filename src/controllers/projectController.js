@@ -1,4 +1,4 @@
-﻿const Project = require('../models/Project');
+const Project = require('../models/Project');
 
 // @desc    Get all projects
 // @route   GET /api/projects
@@ -19,12 +19,18 @@ const createProject = async (req, res) => {
   try {
     const { name, description, status, startDate, endDate } = req.body;
     
+    let logo = '';
+    if (req.file) {
+      logo = `/uploads/project-logos/${req.file.filename}`;
+    }
+
     const project = new Project({
       name,
       description,
       status,
       startDate,
-      endDate
+      endDate,
+      logo
     });
 
     const createdProject = await project.save();
@@ -49,6 +55,10 @@ const updateProject = async (req, res) => {
       project.status = status || project.status;
       project.startDate = startDate !== undefined ? startDate : project.startDate;
       project.endDate = endDate !== undefined ? endDate : project.endDate;
+
+      if (req.file) {
+        project.logo = `/uploads/project-logos/${req.file.filename}`;
+      }
 
       const updatedProject = await project.save();
       res.json(updatedProject);

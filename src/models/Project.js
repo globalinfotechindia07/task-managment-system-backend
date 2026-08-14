@@ -1,4 +1,4 @@
-﻿const mongoose = require('mongoose');
+const mongoose = require('mongoose');
 
 const projectSchema = mongoose.Schema({
   name: {
@@ -18,6 +18,9 @@ const projectSchema = mongoose.Schema({
   },
   endDate: {
     type: Date,
+  },
+  logo: {
+    type: String,
   }
 }, { timestamps: true });
 
