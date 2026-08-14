@@ -58,13 +58,13 @@ const initSocket = (server) => {
     // WebRTC Signaling for Team Meetings
     // ==========================================
 
-    socket.on('join-meeting', (roomId, userId) => {
+    socket.on('join-meeting', (roomId, userData) => {
       socket.join(roomId);
       // Broadcast to everyone else in the room that a new user joined
-      socket.to(roomId).emit('user-connected', userId);
+      socket.to(roomId).emit('user-connected', userData);
 
       socket.on('disconnect', () => {
-        socket.to(roomId).emit('user-disconnected', userId);
+        socket.to(roomId).emit('user-disconnected', typeof userData === 'object' ? userData.id : userData);
       });
     });
 
@@ -73,11 +73,19 @@ const initSocket = (server) => {
       socket.to(roomId).emit('user-disconnected', userId);
     });
 
-    socket.on('invite-to-meeting', ({ roomId, fromName, toUserId }) => {
-      const toSocketId = userSockets.get(toUserId);
-      if (toSocketId) {
-        io.to(toSocketId).emit('meeting-invite', { roomId, fromName });
-      }
+    socket.on('media-state-changed', (roomId, payload) => {
+      // payload: { userId, isVideoEnabled, isAudioEnabled }
+      socket.to(roomId).emit('media-state-changed', payload);
+    });
+
+    socket.on('meeting-chat', (roomId, payload) => {
+      // payload: { userId, userName, text, time }
+      socket.to(roomId).emit('meeting-chat', payload);
+    });
+
+    socket.on('meeting-reaction', (roomId, payload) => {
+      // payload: { userId, reaction }
+      socket.to(roomId).emit('meeting-reaction', payload);
     });
 
     socket.on('offer', (payload) => {
