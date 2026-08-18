@@ -88,6 +88,11 @@ const initSocket = (server) => {
       socket.to(roomId).emit('meeting-reaction', payload);
     });
 
+    socket.on('screen-share-status', (roomId, payload) => {
+      // payload: { isSharing: boolean, userId: string, userName: string }
+      socket.to(roomId).emit('screen-share-status', payload);
+    });
+
     socket.on('offer', (payload) => {
       // payload: { to: userId, caller: userId, sdp: offer }
       const toSocketId = userSockets.get(payload.to);
