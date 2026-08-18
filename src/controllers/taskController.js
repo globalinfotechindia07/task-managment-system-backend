@@ -59,9 +59,11 @@ const createTask = async (req, res) => {
 
     const attachments = req.files ? req.files.map(file => `/uploads/${file.filename}`) : [];
 
-    // Adjust start date to working hours and calculate due date automatically
-    const adjustedStartDate = adjustToWorkingHours(startDate || new Date());
-    const calculatedDueDate = estimatedTimeDuration ? calculateTaskDueDate(adjustedStartDate, estimatedTimeDuration) : dueDate;
+    // If a regular user creates a task, it goes to Awaiting Approval
+    const initialStatus = req.user.role === 'User' ? 'Awaiting Approval' : (status || 'Pending');
+
+    const adjustedStartDate = startDate ? new Date(startDate) : new Date();
+    const calculatedDueDate = dueDate ? new Date(dueDate) : null;
 
     const task = new Task({
       title,
@@ -73,7 +75,7 @@ const createTask = async (req, res) => {
       dueDate: calculatedDueDate,
       estimatedTimeDuration,
       priority,
-      status: status || 'Pending',
+      status: initialStatus,
       attachments,
       history: [{
         action: 'Task created',
