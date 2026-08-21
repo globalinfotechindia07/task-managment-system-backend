@@ -10,13 +10,22 @@ const importData = async () => {
   try {
     await User.deleteMany(); // Clear existing users
 
-    const admin = await User.create({
-      name: 'Admin User',
-      email: 'admin@globalinfotech.com',
-      password: 'password123',
-      role: 'Admin',
-      designation: 'System Administrator'
-    });
+    const admin = await User.create([
+      {
+        name: 'Admin User',
+        email: 'admin@globalinfotech.com',
+        password: 'password123',
+        role: 'Admin',
+        designation: 'System Administrator'
+      },
+      {
+        name: 'DM Tawade',
+        email: 'dmtawade18@gmail.com',
+        password: 'password123',
+        role: 'Admin',
+        designation: 'System Administrator'
+      }
+    ]);
 
     const pm = await User.create({
       name: 'Project Manager',
