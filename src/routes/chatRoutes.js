@@ -34,9 +34,9 @@ router.use(protect); // All chat routes require authentication
 // Get all conversations (WhatsApp like sidebar)
 router.get('/conversations', getConversations);
 
-// Group routes
-router.post('/groups', authorizeRoles('Admin'), createGroup); // Only admins can create groups
-router.put('/groups/:groupId', authorizeRoles('Admin'), updateGroup); // Only admins can edit groups
+// Chat group routes (Admin and CTO only)
+router.post('/groups', authorizeRoles('Admin', 'CTO'), createGroup); // Only admins/CTOs can create groups
+router.put('/groups/:groupId', authorizeRoles('Admin', 'CTO'), updateGroup); // Only admins/CTOs can edit groups
 router.get('/groups', getUserGroups);
 router.get('/group/:groupId', getGroupMessages);
 

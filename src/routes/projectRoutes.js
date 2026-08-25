@@ -10,11 +10,11 @@ const { protect, authorizeRoles } = require('../middleware/authMiddleware');
 const upload = require('../middleware/uploadMiddleware');
 
 router.route('/')
-  .get(protect, authorizeRoles('Admin', 'Team Head', 'User'), getProjects)
-  .post(protect, authorizeRoles('Admin'), upload.single('logo'), createProject);
+  .get(protect, authorizeRoles('Admin', 'Team Head', 'User', 'CTO'), getProjects)
+  .post(protect, authorizeRoles('Admin', 'CTO'), upload.single('logo'), createProject);
 
 router.route('/:id')
-  .put(protect, authorizeRoles('Admin'), upload.single('logo'), updateProject)
-  .delete(protect, authorizeRoles('Admin'), deleteProject);
+  .put(protect, authorizeRoles('Admin', 'CTO'), upload.single('logo'), updateProject)
+  .delete(protect, authorizeRoles('Admin', 'CTO'), deleteProject);
 
 module.exports = router;

@@ -27,6 +27,14 @@ const importData = async () => {
       }
     ]);
 
+    const cto = await User.create({
+      name: 'Chief Technology Officer',
+      email: 'cto@globalinfotech.com',
+      password: 'password123',
+      role: 'CTO',
+      designation: 'CTO'
+    });
+
     const pm = await User.create({
       name: 'Project Manager',
       email: 'pm@globalinfotech.com',

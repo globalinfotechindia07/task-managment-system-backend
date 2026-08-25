@@ -8,7 +8,7 @@ const {
   deleteAnnouncement,
   updateAnnouncement
 } = require('../controllers/announcementController');
-const { protect } = require('../middleware/authMiddleware');
+const { protect, authorizeRoles } = require('../middleware/authMiddleware');
 
 // Configure Multer for file uploads
 const storage = multer.diskStorage({
@@ -23,10 +23,10 @@ const upload = multer({ storage });
 
 router.route('/')
   .get(protect, getAnnouncements)
-  .post(protect, upload.array('attachments', 5), createAnnouncement);
+  .post(protect, authorizeRoles('Admin', 'HR Manager', 'CTO'), upload.array('attachments', 5), createAnnouncement);
 
 router.route('/:id')
-  .put(protect, upload.array('attachments', 5), updateAnnouncement)
-  .delete(protect, deleteAnnouncement);
+  .put(protect, authorizeRoles('Admin', 'HR Manager', 'CTO'), upload.array('attachments', 5), updateAnnouncement)
+  .delete(protect, authorizeRoles('Admin', 'HR Manager', 'CTO'), deleteAnnouncement);
 
 module.exports = router;
