@@ -137,17 +137,27 @@ const createGroup = async (req, res) => {
   try {
     const { name, members } = req.body;
     
-    if (!name || !members || !Array.isArray(members)) {
+    let membersArray = members;
+    if (typeof members === 'string') {
+      try {
+        membersArray = JSON.parse(members);
+      } catch (e) {
+        membersArray = [members];
+      }
+    }
+
+    if (!name || !membersArray || !Array.isArray(membersArray)) {
       return res.status(400).json({ message: 'Group name and members array are required' });
     }
 
     // Include the creator in the members list if not already there
-    const allMembers = [...new Set([...members, req.user._id.toString()])];
+    const allMembers = [...new Set([...membersArray, req.user._id.toString()])];
 
     const newGroup = new ChatGroup({
       name,
       admin: req.user._id,
-      members: allMembers
+      members: allMembers,
+      groupIcon: req.file ? `/uploads/${req.file.filename}` : undefined
     });
 
     const savedGroup = await newGroup.save();
@@ -171,13 +181,29 @@ const updateGroup = async (req, res) => {
       return res.status(404).json({ message: 'Group not found' });
     }
 
-    // Admins can update any group in this system, but we can verify admin status via middleware
+    // Only the creator (admin) can edit the group
+    if (group.admin.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ message: 'Only the group creator can edit this group' });
+    }
+
     if (name) group.name = name;
+    if (req.file) group.groupIcon = `/uploads/${req.file.filename}`;
     
-    if (members && Array.isArray(members)) {
-      // Ensure the creator/admin is always in the group to avoid getting locked out
-      const allMembers = [...new Set([...members, req.user._id.toString()])];
-      group.members = allMembers;
+    if (members) {
+      let membersArray = members;
+      if (typeof members === 'string') {
+        try {
+          membersArray = JSON.parse(members);
+        } catch (e) {
+          membersArray = [members];
+        }
+      }
+      
+      if (Array.isArray(membersArray)) {
+        // Ensure the creator/admin is always in the group to avoid getting locked out
+        const allMembers = [...new Set([...membersArray, req.user._id.toString()])];
+        group.members = allMembers;
+      }
     }
 
     const updatedGroup = await group.save();
@@ -276,6 +302,8 @@ const getConversations = async (req, res) => {
         _id: group._id,
         isGroup: true,
         name: group.name,
+        profilePicture: group.groupIcon,
+        admin: group.admin,
         members: group.members,
         unreadCount: 0, // Group unread tracking requires a different schema structure
         latestMessage: latestMessage ? {

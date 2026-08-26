@@ -145,7 +145,61 @@ const sendAnnouncementEmail = async (announcement, users) => {
   await Promise.allSettled(emailPromises);
 };
 
+/**
+ * Send monthly performance report email
+ */
+const sendPerformanceReportEmail = async (user, stats) => {
+  if (!user || !user.email) return;
+
+  const subject = `Monthly Performance Report: ${new Date().toLocaleString('default', { month: 'long' })}`;
+  
+  const performanceStatus = stats.lateTasks > 0 ? 'Needs Improvement' : 'Excellent';
+  const statusColor = stats.lateTasks > 0 ? '#ef4444' : '#10b981';
+
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px;">
+      <h2 style="color: #4f46e5;">Monthly Performance Report</h2>
+      <p>Hello <strong>${user.name}</strong>,</p>
+      <p>Here is your automated performance analysis for the last month.</p>
+      
+      <div style="background-color: #f8fafc; padding: 15px; border-radius: 6px; margin: 20px 0;">
+        <h3 style="margin-top: 0; color: #1e293b;">Task Analytics</h3>
+        
+        <table style="width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 14px;">
+          <tr>
+            <td style="padding: 8px 0; border-bottom: 1px solid #e2e8f0; color: #64748b;"><strong>Total Tasks Completed:</strong></td>
+            <td style="padding: 8px 0; border-bottom: 1px solid #e2e8f0; color: #0f172a;">${stats.totalTasks}</td>
+          </tr>
+          <tr>
+            <td style="padding: 8px 0; border-bottom: 1px solid #e2e8f0; color: #64748b;"><strong>On-Time Completions:</strong></td>
+            <td style="padding: 8px 0; border-bottom: 1px solid #e2e8f0; color: #10b981;">${stats.onTimeTasks}</td>
+          </tr>
+          <tr>
+            <td style="padding: 8px 0; border-bottom: 1px solid #e2e8f0; color: #64748b;"><strong>Overdue Completions:</strong></td>
+            <td style="padding: 8px 0; border-bottom: 1px solid #e2e8f0; color: #ef4444;">${stats.lateTasks}</td>
+          </tr>
+          <tr>
+            <td style="padding: 8px 0; border-bottom: 1px solid #e2e8f0; color: #64748b;"><strong>Total Days Late:</strong></td>
+            <td style="padding: 8px 0; border-bottom: 1px solid #e2e8f0; color: #0f172a;">${stats.totalDaysLate} Days</td>
+          </tr>
+          <tr>
+            <td style="padding: 8px 0; color: #64748b;"><strong>Overall Status:</strong></td>
+            <td style="padding: 8px 0; font-weight: bold; color: ${statusColor};">${performanceStatus}</td>
+          </tr>
+        </table>
+      </div>
+      
+      <div style="text-align: center; margin-top: 30px;">
+        <a href="http://localhost:5174/user/dashboard" style="background-color: #4f46e5; color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px; font-weight: bold;">View Dashboard</a>
+      </div>
+    </div>
+  `;
+
+  await sendEmail(user.email, subject, html);
+};
+
 module.exports = {
   sendTaskAssignmentEmail,
-  sendAnnouncementEmail
+  sendAnnouncementEmail,
+  sendPerformanceReportEmail
 };

@@ -14,7 +14,10 @@ const chatGroupSchema = new mongoose.Schema({
   members: [{
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User'
-  }]
+  }],
+  groupIcon: {
+    type: String
+  }
 }, { timestamps: true });
 
 module.exports = mongoose.model('ChatGroup', chatGroupSchema);

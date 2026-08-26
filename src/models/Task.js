@@ -35,6 +35,9 @@ const taskSchema = mongoose.Schema({
   startDate: {
     type: Date,
   },
+  completedAt: {
+    type: Date,
+  },
   estimatedTimeDuration: {
     type: Number, // In hours
   },

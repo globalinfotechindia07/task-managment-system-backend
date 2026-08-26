@@ -4,6 +4,7 @@ const { sendTaskAssignmentEmail } = require('../utils/emailService');
 const { sendNotificationToUser } = require('../utils/pushService');
 const { calculateTaskDueDate, adjustToWorkingHours } = require('../utils/timeCalculator');
 const { sendRealTimeNotification, emitTaskUpdate } = require('../utils/socketService');
+const PerformanceLog = require('../models/PerformanceLog');
 const Notification = require('../models/Notification');
 
 // @desc    Get all tasks (with filters)
@@ -139,6 +140,10 @@ const updateTask = async (req, res) => {
             user: req.user._id
           });
           task[field] = updates[field];
+          
+          if (field === 'status' && updates.status === 'Completed') {
+            task.completedAt = new Date();
+          }
         }
       });
 
@@ -177,6 +182,27 @@ const updateTask = async (req, res) => {
             type: 'task_updated',
           });
           sendRealTimeNotification(notifyUserId, newNotif);
+          
+          if (updates.status === 'Completed') {
+            let daysLate = 0;
+            if (updatedTask.dueDate && updatedTask.completedAt) {
+              const diffTime = updatedTask.completedAt - new Date(updatedTask.dueDate);
+              if (diffTime > 0) {
+                daysLate = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+              }
+            }
+            
+            await PerformanceLog.create({
+              user: updatedTask.assignedTo._id,
+              task: updatedTask._id,
+              dueDate: updatedTask.dueDate || updatedTask.completedAt,
+              completedAt: updatedTask.completedAt,
+              daysLate: daysLate,
+              status: daysLate > 0 ? 'Late' : 'OnTime',
+              month: updatedTask.completedAt.getMonth() + 1,
+              year: updatedTask.completedAt.getFullYear()
+            });
+          }
         }
 
         // Always emit task update to both assigner and assignee to keep views in sync

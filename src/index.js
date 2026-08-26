@@ -17,6 +17,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
 const path = require('path');
+const initMonthlyReportJob = require('./jobs/monthlyReportJob');
 
 // Routes
 app.use('/api/auth', require('./routes/authRoutes'));
@@ -27,6 +28,7 @@ app.use('/api/push', require('./routes/pushRoutes'));
 app.use('/api/settings', require('./routes/settingsRoutes'));
 app.use('/api/projects', require('./routes/projectRoutes'));
 app.use('/api/notifications', require('./routes/notificationRoutes'));
+app.use('/api/performance', require('./routes/performanceRoutes'));
 app.use('/api/chat', require('./routes/chatRoutes'));
 
 // Serve static files for uploads
@@ -50,6 +52,9 @@ const server = http.createServer(app);
 
 // Initialize Socket.IO
 initSocket(server);
+
+// Initialize Cron Jobs
+initMonthlyReportJob();
 
 const PORT = process.env.PORT || 5000;
 

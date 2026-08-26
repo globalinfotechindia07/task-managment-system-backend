@@ -7,7 +7,10 @@ const getUsers = async (req, res) => {
   try {
     const filter = {};
     if (req.user.role === 'Team Head') {
-      filter.teamHead = req.user._id;
+      filter.$or = [
+        { teamHead: req.user._id },
+        { _id: req.user._id }
+      ];
     } else if (req.user.role === 'HR Manager') {
       filter.role = { $ne: 'Admin' };
     }
