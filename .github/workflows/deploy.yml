@@ -13,48 +13,29 @@ jobs:
 
     steps:
 
-      # 1. Checkout repository
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      # 2. Setup Node.js
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
 
-      # 3. Install dependencies
       - name: Install Dependencies
         run: npm install
 
-      # 4. Deploy to VPS
-      - name: Deploy Backend to VPS
-        uses: appleboy/ssh-action@v1.2.2
+      - name: Deploy Backend using FTP
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.6
         with:
-          host: 198.38.89.11
+          server: globalinfotechindia.com
           username: globalinfotechin_taskmanagement_backend
+          password: evdUB7!!q
+          protocol: ftp
           port: 21
-          key: ${{ secrets.SERVER_SSH_KEY }}
-
-          script: |
-            cd /path/to/backend
-
-            echo "Installing backend dependencies..."
-            npm install
-
-            echo "Setting Node.js file permissions..."
-            chmod +x node_modules/.bin/sequelize
-
-            echo "Running database migrations..."
-            npx sequelize db:migrate --env production
-
-            echo "Checking PM2 processes..."
-            pm2 list
-
-            echo "Restarting backend..."
-            pm2 restart backend
-
-            echo "Saving PM2 configuration..."
-            pm2 save
-
-            echo "Backend deployment completed successfully!"
+          local-dir: ./
+          server-dir: /YOUR/BACKEND/PATH/
+          exclude: |
+            **/.git*
+            **/.git*/**
+            **/node_modules/**
+            **/.env
