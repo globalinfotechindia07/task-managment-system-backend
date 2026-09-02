@@ -31,7 +31,7 @@ jobs:
       - name: Deploy Backend to VPS
         uses: appleboy/ssh-action@v1.2.2
         with:
-          host: ${{ secrets.SERVER_HOST }}
+          host: 198.38.89.11
           username: globalinfotechin_taskmanagement_backend
           port: 21
           key: ${{ secrets.SERVER_SSH_KEY }}
