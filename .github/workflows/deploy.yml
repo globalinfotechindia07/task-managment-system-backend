@@ -43,7 +43,7 @@ jobs:
             npm install
 
             echo "Setting Node.js file permissions..."
-            chmod +x <your-node-file>
+            chmod +x node_modules/.bin/sequelize
 
             echo "Running database migrations..."
             npx sequelize db:migrate --env production
@@ -56,3 +56,5 @@ jobs:
 
             echo "Saving PM2 configuration..."
             pm2 save
+
+            echo "Backend deployment completed successfully!"
