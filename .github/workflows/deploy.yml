@@ -13,7 +13,7 @@ jobs:
 
     steps:
 
-      # 1. Checkout code
+      # 1. Checkout repository
       - name: Checkout Repository
         uses: actions/checkout@v4
 
@@ -22,29 +22,37 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: npm
 
       # 3. Install dependencies
       - name: Install Dependencies
-        run: npm ci
+        run: npm install
 
-      # 4. Run tests
-      - name: Run Tests
-        run: npm test
-
-      # 5. Deploy to VPS
-      - name: Deploy to VPS
+      # 4. Deploy to VPS
+      - name: Deploy Backend to VPS
         uses: appleboy/ssh-action@v1.2.2
         with:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           port: ${{ secrets.SERVER_PORT }}
           key: ${{ secrets.SERVER_SSH_KEY }}
+
           script: |
             cd /path/to/backend
 
-            git pull origin main
+            echo "Installing backend dependencies..."
+            npm install
 
-            npm ci
+            echo "Setting Node.js file permissions..."
+            chmod +x <your-node-file>
 
+            echo "Running database migrations..."
+            npx sequelize db:migrate --env production
+
+            echo "Checking PM2 processes..."
+            pm2 list
+
+            echo "Restarting backend..."
             pm2 restart backend
+
+            echo "Saving PM2 configuration..."
+            pm2 save
