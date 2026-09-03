@@ -18,6 +18,7 @@ app.use(express.urlencoded({ extended: false }));
 
 const path = require('path');
 const initMonthlyReportJob = require('./jobs/monthlyReportJob');
+const initMonthlyPayrollJob = require('./jobs/monthlyPayrollJob');
 
 // Routes
 app.use('/api/auth', require('./routes/authRoutes'));
@@ -30,6 +31,8 @@ app.use('/api/projects', require('./routes/projectRoutes'));
 app.use('/api/notifications', require('./routes/notificationRoutes'));
 app.use('/api/performance', require('./routes/performanceRoutes'));
 app.use('/api/chat', require('./routes/chatRoutes'));
+app.use('/api/attendance', require('./routes/attendanceRoutes'));
+app.use('/api/payroll', require('./routes/payrollRoutes'));
 
 // Serve static files for uploads
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
@@ -55,6 +58,7 @@ initSocket(server);
 
 // Initialize Cron Jobs
 initMonthlyReportJob();
+initMonthlyPayrollJob();
 
 const PORT = process.env.PORT || 5000;
 
