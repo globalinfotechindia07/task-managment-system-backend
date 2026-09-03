@@ -1,0 +1,41 @@
+name: Backend CI/CD
+
+on:
+  push:
+    branches:
+      - main
+
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install Dependencies
+        run: npm install
+
+      - name: Deploy Backend using FTP
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.6
+        with:
+          server: globalinfotechindia.com
+          username: globalinfotechin_taskmanagement_backend
+          password: evdUB7!!q
+          protocol: ftp
+          port: 21
+          local-dir: ./
+          server-dir: /YOUR/BACKEND/PATH/
+          exclude: |
+            **/.git*
+            **/.git*/**
+            **/node_modules/**
+            **/.env
