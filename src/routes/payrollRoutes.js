@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const {
   getConfig,
+  getMyConfig,
   updateConfig,
   generateSalary,
   getMySlips,
@@ -11,6 +12,7 @@ const { protect, authorizeRoles } = require('../middleware/authMiddleware');
 
 router.get('/config/:userId', protect, authorizeRoles('Admin', 'CTO', 'HR Manager'), getConfig);
 router.post('/config', protect, authorizeRoles('Admin', 'CTO', 'HR Manager'), updateConfig);
+router.get('/my-config', protect, getMyConfig);
 
 router.post('/generate', protect, authorizeRoles('Admin', 'CTO', 'HR Manager'), generateSalary);
 

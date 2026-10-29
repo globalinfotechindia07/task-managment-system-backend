@@ -82,6 +82,14 @@ exports.punchIn = async (req, res) => {
     const limitTime = new Date(expectedInTime.getTime() + policy.bufferMinutes * 60000);
     
     let status = 'Present';
+    let lateByMinutes = 0;
+    
+    // Calculate late duration from exact inTime (no buffer for duration calc)
+    const diffMs = now.getTime() - expectedInTime.getTime();
+    if (diffMs > 0) {
+      lateByMinutes = Math.floor(diffMs / 60000);
+    }
+    
     if (now > limitTime) {
       status = 'Late';
     }
@@ -93,6 +101,7 @@ exports.punchIn = async (req, res) => {
       date: today,
       punchIn: now,
       status,
+      lateByMinutes,
       punchInLocation: {
         latitude: parseFloat(latitude),
         longitude: parseFloat(longitude)
@@ -120,6 +129,8 @@ exports.punchOut = async (req, res) => {
       return res.status(400).json({ message: 'Already punched out today.' });
     }
 
+    const photoPath = req.file ? `/uploads/attendance/${req.file.filename}` : null;
+    attendance.punchOutPhoto = photoPath;
     attendance.punchOut = new Date();
     await attendance.save();
 

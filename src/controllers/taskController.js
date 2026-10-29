@@ -13,34 +13,29 @@ const Notification = require('../models/Notification');
 const getTasks = async (req, res) => {
   try {
     const filter = {};
-    // If regular user, only show assigned tasks
-    if (req.user.role === 'User') {
-      filter.assignedTo = req.user._id;
-    } else if (req.user.role === 'Team Head') {
-      // Find all users who report to this Team Head
-      const teamMembers = await User.find({ teamHead: req.user._id }).select('_id');
-      const teamMemberIds = teamMembers.map(member => member._id);
-      
-      // Also include the team head themselves just in case they have their own tasks
-      teamMemberIds.push(req.user._id);
+    const { project, status, priority, assignedTo, myTasks } = req.query;
 
-      filter.$or = [
-        { assignedTo: { $in: teamMemberIds } },
-        { assignedBy: req.user._id }
-      ];
+    if (project && project !== 'All') {
+      filter.project = project;
+    }
+    if (status && status !== 'All') {
+      filter.status = status;
+    }
+    if (priority && priority !== 'All') {
+      filter.priority = priority;
     }
 
-    // Admins see everything.
+    if (myTasks === 'true') {
+      filter.assignedTo = req.user._id;
+    } else if (assignedTo && assignedTo !== 'All') {
+      filter.assignedTo = assignedTo;
+    }
 
     let tasks = await Task.find(filter)
       .populate('project', 'name status')
-      .populate('assignedTo', 'name email role')
+      .populate('assignedTo', 'name email role department')
       .populate('assignedBy', 'name email role')
       .sort({ createdAt: -1 });
-
-    if (req.user.role === 'HR Manager') {
-      tasks = tasks.filter(t => t.assignedTo?.role !== 'Admin' && t.assignedBy?.role !== 'Admin');
-    }
 
     res.json(tasks);
   } catch (error) {

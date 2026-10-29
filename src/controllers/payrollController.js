@@ -8,7 +8,29 @@ exports.getConfig = async (req, res) => {
   try {
     let config = await UserSalary.findOne({ user: req.params.userId });
     if (!config) {
-      config = { baseLPA: 0, pfDeduction: 0, professionalTax: 0 };
+      config = { 
+        fixedCTC: 0,
+        earnings: { basic: 0, hra: 0, exGratia: 0, splAllowance: 0 },
+        deductions: { pf: 0, esic: 0, labourWelfareFund: 0, professionalTax: 0, welfareFund: 0 },
+        employerContributions: { pf: 0, esic: 0, labourWelfareFund: 0, professionalTax: 0 }
+      };
+    }
+    res.json(config);
+  } catch (error) {
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+exports.getMyConfig = async (req, res) => {
+  try {
+    let config = await UserSalary.findOne({ user: req.user._id });
+    if (!config) {
+      config = { 
+        fixedCTC: 0,
+        earnings: { basic: 0, hra: 0, exGratia: 0, splAllowance: 0 },
+        deductions: { pf: 0, esic: 0, labourWelfareFund: 0, professionalTax: 0, welfareFund: 0 },
+        employerContributions: { pf: 0, esic: 0, labourWelfareFund: 0, professionalTax: 0 }
+      };
     }
     res.json(config);
   } catch (error) {
@@ -18,20 +40,22 @@ exports.getConfig = async (req, res) => {
 
 exports.updateConfig = async (req, res) => {
   try {
-    const { userId, baseLPA, pfDeduction, professionalTax } = req.body;
+    const { userId, fixedCTC, earnings, deductions, employerContributions } = req.body;
     let config = await UserSalary.findOne({ user: userId });
     
     if (config) {
-      config.baseLPA = baseLPA;
-      config.pfDeduction = pfDeduction;
-      config.professionalTax = professionalTax;
+      config.fixedCTC = fixedCTC || 0;
+      config.earnings = earnings || {};
+      config.deductions = deductions || {};
+      config.employerContributions = employerContributions || {};
       await config.save();
     } else {
       config = await UserSalary.create({
         user: userId,
-        baseLPA,
-        pfDeduction,
-        professionalTax
+        fixedCTC,
+        earnings,
+        deductions,
+        employerContributions
       });
     }
     res.json(config);
@@ -52,9 +76,7 @@ exports.generateSalary = async (req, res) => {
 
     for (const user of users) {
       const config = await UserSalary.findOne({ user: user._id });
-      if (!config || config.baseLPA === 0) continue; // Skip if no salary config
-
-      const monthlyGross = config.baseLPA / 12;
+      if (!config || !config.fixedCTC) continue; // Skip if no salary config
 
       // Get Attendance for the month
       const startDate = new Date(year, month - 1, 1).toISOString().split('T')[0];
@@ -70,19 +92,30 @@ exports.generateSalary = async (req, res) => {
       const halfDays = attendanceLogs.filter(log => log.status === 'Half Day').length;
       const absentDays = attendanceLogs.filter(log => log.status === 'Absent').length;
 
-      const workingDaysInMonth = 22; // Assume 22 for now, can be calculated precisely based on policy.workingDays
+      const workingDaysInMonth = 22; // Assume 22 for now
+
+      // Earnings (A)
+      const e = config.earnings || {};
+      const grossEarnings = (e.basic || 0) + (e.hra || 0) + (e.exGratia || 0) + (e.splAllowance || 0);
 
       // Calculate Late Deductions
       let lateDeductionAmount = 0;
       if (lateDays > policy.allowedLateMarks) {
         const excessLateDays = lateDays - policy.allowedLateMarks;
-        const perDaySalary = monthlyGross / workingDaysInMonth;
+        const perDaySalary = grossEarnings / workingDaysInMonth;
         lateDeductionAmount = excessLateDays * perDaySalary;
       }
 
-      // Calculate Net Pay
-      const totalDeductions = config.pfDeduction + config.professionalTax + lateDeductionAmount;
-      const netPay = monthlyGross - totalDeductions;
+      // Deductions (B)
+      const d = config.deductions || {};
+      const totalDeductions = (d.pf || 0) + (d.esic || 0) + (d.labourWelfareFund || 0) + (d.professionalTax || 0) + (d.welfareFund || 0) + lateDeductionAmount;
+
+      // Employer Contributions (C)
+      const c = config.employerContributions || {};
+      const totalEmployerContributions = (c.pf || 0) + (c.esic || 0) + (c.labourWelfareFund || 0) + (c.professionalTax || 0);
+
+      // Net Pay = A - B
+      const netPay = grossEarnings - totalDeductions;
 
       // Create or update Slip
       let slip = await SalarySlip.findOne({ user: user._id, month, year });
@@ -90,13 +123,16 @@ exports.generateSalary = async (req, res) => {
         user: user._id,
         month,
         year,
-        grossSalary: monthlyGross,
+        fixedCTC: config.fixedCTC,
+        earnings: e,
         deductions: {
-          pf: config.pfDeduction,
-          pt: config.professionalTax,
-          lateDeduction: lateDeductionAmount,
-          other: 0
+          ...d,
+          lateDeduction: lateDeductionAmount
         },
+        employerContributions: c,
+        grossEarnings,
+        totalDeductions,
+        totalEmployerContributions,
         netPay,
         stats: {
           totalDays: new Date(year, month, 0).getDate(),

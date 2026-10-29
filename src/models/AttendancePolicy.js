@@ -11,6 +11,10 @@ const attendancePolicySchema = mongoose.Schema({
     required: true,
     default: 0
   },
+  officeAddress: {
+    type: String,
+    default: ""
+  },
   allowedRadiusMeters: {
     type: Number,
     required: true,

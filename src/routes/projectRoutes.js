@@ -10,7 +10,7 @@ const { protect, authorizeRoles } = require('../middleware/authMiddleware');
 const upload = require('../middleware/uploadMiddleware');
 
 router.route('/')
-  .get(protect, authorizeRoles('Admin', 'Team Head', 'User', 'CTO'), getProjects)
+  .get(protect, authorizeRoles('Admin', 'Team Head', 'User', 'CTO', 'HR Manager'), getProjects)
   .post(protect, authorizeRoles('Admin', 'CTO'), upload.single('logo'), createProject);
 
 router.route('/:id')

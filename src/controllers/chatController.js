@@ -10,15 +10,20 @@ const getMessages = async (req, res) => {
   try {
     const { userId } = req.params;
     const currentUserId = req.user._id;
+    const limit = parseInt(req.query.limit) || 50;
+    const skip = parseInt(req.query.skip) || 0;
 
     const messages = await Message.find({
       $or: [
         { sender: currentUserId, receiver: userId },
         { sender: userId, receiver: currentUserId }
       ]
-    }).sort({ createdAt: 1 });
+    })
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit);
 
-    res.json(messages);
+    res.json(messages.reverse());
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -231,6 +236,8 @@ const getUserGroups = async (req, res) => {
 const getGroupMessages = async (req, res) => {
   try {
     const { groupId } = req.params;
+    const limit = parseInt(req.query.limit) || 50;
+    const skip = parseInt(req.query.skip) || 0;
     
     // Optional: check if user is in group
     const group = await ChatGroup.findById(groupId);
@@ -238,8 +245,13 @@ const getGroupMessages = async (req, res) => {
       return res.status(403).json({ message: 'Not a member of this group' });
     }
 
-    const messages = await Message.find({ groupId }).sort({ createdAt: 1 }).populate('sender', 'name profilePicture');
-    res.json(messages);
+    const messages = await Message.find({ groupId })
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .populate('sender', 'name profilePicture');
+      
+    res.json(messages.reverse());
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

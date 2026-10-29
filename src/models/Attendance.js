@@ -7,7 +7,7 @@ const attendanceSchema = mongoose.Schema({
     required: true
   },
   date: {
-    type: String, // YYYY-MM-DD
+    type: String, 
     required: true
   },
   punchIn: {
@@ -22,11 +22,18 @@ const attendanceSchema = mongoose.Schema({
     enum: ['Present', 'Late', 'Half Day', 'Absent'],
     default: 'Present'
   },
+  lateByMinutes: {
+    type: Number,
+    default: 0
+  },
   punchInLocation: {
     latitude: Number,
     longitude: Number
   },
   punchInPhoto: {
+    type: String // URL of the captured selfie
+  },
+  punchOutPhoto: {
     type: String // URL of the captured selfie
   }
 }, { timestamps: true });
