@@ -6,6 +6,10 @@ const chatGroupSchema = new mongoose.Schema({
     required: true,
     trim: true
   },
+  company: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Company',
+  },
   admin: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',

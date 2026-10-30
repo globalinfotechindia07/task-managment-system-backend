@@ -19,9 +19,10 @@ const getDistance = (lat1, lon1, lat2, lon2) => {
 
 exports.getPolicy = async (req, res) => {
   try {
-    let policy = await AttendancePolicy.findOne();
+    const filter = req.companyId ? { company: req.companyId } : {};
+    let policy = await AttendancePolicy.findOne(filter);
     if (!policy) {
-      policy = await AttendancePolicy.create({});
+      policy = await AttendancePolicy.create({ company: req.companyId });
     }
     res.json(policy);
   } catch (error) {
@@ -31,11 +32,12 @@ exports.getPolicy = async (req, res) => {
 
 exports.updatePolicy = async (req, res) => {
   try {
-    let policy = await AttendancePolicy.findOne();
+    const filter = req.companyId ? { company: req.companyId } : {};
+    let policy = await AttendancePolicy.findOne(filter);
     if (!policy) {
-      policy = await AttendancePolicy.create(req.body);
+      policy = await AttendancePolicy.create({ ...req.body, company: req.companyId });
     } else {
-      policy = await AttendancePolicy.findOneAndUpdate({}, req.body, { new: true });
+      policy = await AttendancePolicy.findOneAndUpdate(filter, req.body, { new: true });
     }
     res.json(policy);
   } catch (error) {
@@ -48,8 +50,9 @@ exports.punchIn = async (req, res) => {
     const { latitude, longitude } = req.body;
     
     // Get Policy
-    let policy = await AttendancePolicy.findOne();
-    if (!policy) policy = await AttendancePolicy.create({});
+    const policyFilter = req.companyId ? { company: req.companyId } : {};
+    let policy = await AttendancePolicy.findOne(policyFilter);
+    if (!policy) policy = await AttendancePolicy.create({ company: req.companyId });
     
     // Check Location
     if (policy.officeLatitude && policy.officeLongitude) {
@@ -98,6 +101,7 @@ exports.punchIn = async (req, res) => {
 
     attendance = await Attendance.create({
       user: req.user._id,
+      company: req.companyId || req.user.company,
       date: today,
       punchIn: now,
       status,
@@ -162,6 +166,11 @@ exports.getAllAttendance = async (req, res) => {
   try {
     const { date } = req.query; // YYYY-MM-DD
     let filter = {};
+    if (req.user.role !== 'Super Admin') {
+      const companyId = req.companyId || req.user.company?._id || req.user.company;
+      if (!companyId) return res.json([]);
+      filter.company = companyId;
+    }
     if (date) filter.date = date;
 
     const logs = await Attendance.find(filter)

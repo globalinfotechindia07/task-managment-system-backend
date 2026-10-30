@@ -6,6 +6,10 @@ const performanceLogSchema = new mongoose.Schema({
     ref: 'User',
     required: true
   },
+  company: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Company',
+  },
   task: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Task',

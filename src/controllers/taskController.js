@@ -25,6 +25,15 @@ const getTasks = async (req, res) => {
       filter.priority = priority;
     }
 
+    // Multi-tenant isolation:
+    if (req.user.role !== 'Super Admin') {
+      const companyId = req.companyId || req.user.company?._id || req.user.company;
+      if (!companyId) return res.json([]);
+      filter.company = companyId;
+    } else if (req.query.company) {
+      filter.company = req.query.company;
+    }
+
     if (myTasks === 'true') {
       filter.assignedTo = req.user._id;
     } else if (assignedTo && assignedTo !== 'All') {
@@ -64,6 +73,7 @@ const createTask = async (req, res) => {
     const task = new Task({
       title,
       description,
+      company: req.companyId || req.body.companyId,
       project,
       assignedTo,
       assignedBy: req.user._id,

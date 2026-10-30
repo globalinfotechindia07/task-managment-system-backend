@@ -48,10 +48,14 @@ exports.updateConfig = async (req, res) => {
       config.earnings = earnings || {};
       config.deductions = deductions || {};
       config.employerContributions = employerContributions || {};
+      if (!config.company && (req.companyId || req.user.company)) {
+        config.company = req.companyId || req.user.company;
+      }
       await config.save();
     } else {
       config = await UserSalary.create({
         user: userId,
+        company: req.companyId || req.user.company,
         fixedCTC,
         earnings,
         deductions,
@@ -68,9 +72,14 @@ exports.generateSalary = async (req, res) => {
   try {
     const { month, year } = req.body;
     
-    // Get all users who have salary config
-    const users = await User.find({ role: { $ne: 'Admin' } });
-    const policy = await AttendancePolicy.findOne() || { allowedLateMarks: 3 };
+    // Get all users who have salary config within company
+    const userFilter = { role: { $nin: ['Admin', 'Super Admin'] } };
+    if (req.user.role !== 'Super Admin' && req.companyId) {
+      userFilter.company = req.companyId;
+    }
+    const users = await User.find(userFilter);
+    const policyFilter = req.companyId ? { company: req.companyId } : {};
+    const policy = await AttendancePolicy.findOne(policyFilter) || { allowedLateMarks: 3 };
     
     const results = [];
 
@@ -121,6 +130,7 @@ exports.generateSalary = async (req, res) => {
       let slip = await SalarySlip.findOne({ user: user._id, month, year });
       const slipData = {
         user: user._id,
+        company: req.companyId || user.company,
         month,
         year,
         fixedCTC: config.fixedCTC,
@@ -172,8 +182,12 @@ exports.getAllSlips = async (req, res) => {
   try {
     const { month, year } = req.query;
     let filter = {};
+    if (req.user.role !== 'Super Admin' && req.companyId) {
+      filter.company = req.companyId;
+    }
     if (month && year) {
-      filter = { month: parseInt(month), year: parseInt(year) };
+      filter.month = parseInt(month);
+      filter.year = parseInt(year);
     }
     const slips = await SalarySlip.find(filter)
       .populate('user', 'name email designation department')

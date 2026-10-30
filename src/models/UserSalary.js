@@ -7,6 +7,10 @@ const userSalarySchema = mongoose.Schema({
     required: true,
     unique: true
   },
+  company: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Company',
+  },
   fixedCTC: {
     type: Number,
     required: true,

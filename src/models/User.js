@@ -18,10 +18,23 @@ const userSchema = mongoose.Schema({
   role: {
     type: String,
     required: true,
+    enum: ['Super Admin', 'Admin', 'CTO', 'Team Head', 'HR Manager', 'User'],
+    default: 'User',
+  },
+  company: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Company',
+    required: function() {
+      return this.role !== 'Super Admin';
+    }
+  },
+  createdBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
   },
   designation: {
     type: String,
-    required: true,
+    default: 'Staff',
   },
   status: {
     type: String,

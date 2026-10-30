@@ -8,7 +8,11 @@ const { sendNotificationToUser } = require('../utils/pushService');
 // @access  Private
 const getAnnouncements = async (req, res) => {
   try {
-    const announcements = await Announcement.find()
+    const filter = {};
+    if (req.user.role !== 'Super Admin' && req.companyId) {
+      filter.company = req.companyId;
+    }
+    const announcements = await Announcement.find(filter)
       .populate('createdBy', 'name role')
       .sort({ createdAt: -1 });
     res.json(announcements);
@@ -33,14 +37,16 @@ const createAnnouncement = async (req, res) => {
       scheduledDate,
       expireDate,
       attachments,
-      createdBy: req.user._id
+      createdBy: req.user._id,
+      company: req.companyId || req.user.company
     });
 
     const createdAnnouncement = await announcement.save();
     await createdAnnouncement.populate('createdBy', 'name role');
     
-    // Fetch all users to send the announcement
-    const allUsers = await User.find({}).select('email pushSubscriptions');
+    // Fetch users of the same company to send the announcement
+    const userFilter = req.companyId ? { company: req.companyId } : {};
+    const allUsers = await User.find(userFilter).select('email pushSubscriptions');
     sendAnnouncementEmail(createdAnnouncement, allUsers).catch(err => {
       console.error('Failed to send announcement emails:', err);
     });
@@ -73,7 +79,11 @@ const deleteAnnouncement = async (req, res) => {
       return res.status(404).json({ message: 'Announcement not found' });
     }
 
-    if (announcement.createdBy.toString() !== req.user._id.toString() && req.user.role !== 'Admin') {
+    if (req.user.role !== 'Super Admin' && announcement.company && req.companyId && announcement.company.toString() !== req.companyId.toString()) {
+      return res.status(403).json({ message: 'Not authorized for this office announcement' });
+    }
+
+    if (announcement.createdBy.toString() !== req.user._id.toString() && req.user.role !== 'Admin' && req.user.role !== 'Super Admin') {
        return res.status(403).json({ message: 'Not authorized to delete this announcement' });
     }
 
@@ -95,7 +105,11 @@ const updateAnnouncement = async (req, res) => {
       return res.status(404).json({ message: 'Announcement not found' });
     }
 
-    if (announcement.createdBy.toString() !== req.user._id.toString() && req.user.role !== 'Admin') {
+    if (req.user.role !== 'Super Admin' && announcement.company && req.companyId && announcement.company.toString() !== req.companyId.toString()) {
+      return res.status(403).json({ message: 'Not authorized for this office announcement' });
+    }
+
+    if (announcement.createdBy.toString() !== req.user._id.toString() && req.user.role !== 'Admin' && req.user.role !== 'Super Admin') {
        return res.status(403).json({ message: 'Not authorized to update this announcement' });
     }
 

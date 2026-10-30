@@ -6,7 +6,7 @@ const { protect, authorizeRoles } = require('../middleware/authMiddleware');
 router.use(protect);
 
 // Only managers/admins can view these reports
-router.use(authorizeRoles('Admin', 'CTO', 'HR', 'Team Head'));
+router.use(authorizeRoles('Admin', 'CTO', 'HR Manager', 'Team Head'));
 
 router.get('/summary', getPerformanceSummary);
 router.get('/logs/:userId', getUserPerformanceLogs);

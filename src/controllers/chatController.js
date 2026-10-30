@@ -49,7 +49,8 @@ const sendMessage = async (req, res) => {
       sender: senderId,
       receiver: receiverId || undefined,
       groupId: groupId || undefined,
-      text
+      text,
+      company: req.companyId || req.user.company
     });
 
     const savedMessage = await message.save();
@@ -92,7 +93,8 @@ const sendMediaMessage = async (req, res) => {
       groupId: groupId || undefined,
       text: text || '',
       mediaUrl,
-      mediaType: mediaType || 'document'
+      mediaType: mediaType || 'document',
+      company: req.companyId || req.user.company
     });
 
     const savedMessage = await message.save();
@@ -162,7 +164,8 @@ const createGroup = async (req, res) => {
       name,
       admin: req.user._id,
       members: allMembers,
-      groupIcon: req.file ? `/uploads/${req.file.filename}` : undefined
+      groupIcon: req.file ? `/uploads/${req.file.filename}` : undefined,
+      company: req.companyId || req.user.company
     });
 
     const savedGroup = await newGroup.save();
@@ -265,11 +268,27 @@ const getConversations = async (req, res) => {
   try {
     const userId = req.user._id;
 
-    // 1. Get all users (except self)
-    const users = await User.find({ _id: { $ne: userId } }).select('-password');
+    // 1. Get users of the same company (except self)
+    const userQuery = { _id: { $ne: userId } };
+    if (req.user.role !== 'Super Admin') {
+      const companyId = req.companyId || req.user.company?._id || req.user.company;
+      if (!companyId) return res.json([]);
+      userQuery.company = companyId;
+
+      if (req.user.role === 'HR Manager') {
+        userQuery.role = { $in: ['User', 'Team Head'] };
+      }
+    }
+    const users = await User.find(userQuery).select('-password');
     
     // 2. Get all groups where user is a member
-    const groups = await ChatGroup.find({ members: userId }).populate('members', 'name role profilePicture');
+    const groupQuery = { members: userId };
+    if (req.user.role !== 'Super Admin') {
+      const companyId = req.companyId || req.user.company?._id || req.user.company;
+      if (!companyId) return res.json([]);
+      groupQuery.company = companyId;
+    }
+    const groups = await ChatGroup.find(groupQuery).populate('members', 'name role profilePicture');
 
     const conversations = [];
 

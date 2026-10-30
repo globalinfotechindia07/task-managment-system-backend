@@ -12,23 +12,38 @@ const generateToken = (id) => {
 // @route   POST /api/auth/login
 // @access  Public
 const authUser = async (req, res) => {
-  const { email, password } = req.body;
+  const email = (req.body.email || '').trim().toLowerCase();
+  const password = (req.body.password || '').trim();
   
   console.log(`\n--- Login Attempt ---`);
   console.log(`Email provided: ${email}`);
 
   try {
-    const user = await User.findOne({ email });
+    const user = await User.findOne({ 
+      email: { $regex: new RegExp(`^${email}$`, 'i') } 
+    }).populate('company');
     console.log(`User found in DB: ${user ? 'Yes' : 'No'}`);
 
     if (user && (await user.matchPassword(password))) {
       console.log(`Password matched for user: ${email}`);
+      
+      // Check if user status is inactive
+      if (user.status === 'Inactive') {
+        return res.status(403).json({ message: 'Your account is currently inactive. Please contact support.' });
+      }
+
+      // Check if company is suspended
+      if (user.role !== 'Super Admin' && user.company && user.company.status === 'Suspended') {
+        return res.status(403).json({ message: 'Your company/office account has been suspended. Please contact the platform admin.' });
+      }
+
       res.json({
         _id: user._id,
         name: user.name,
         email: user.email,
         role: user.role,
         designation: user.designation,
+        company: user.company,
         profilePicture: user.profilePicture,
         requiresPasswordChange: user.requiresPasswordChange,
         token: generateToken(user._id),

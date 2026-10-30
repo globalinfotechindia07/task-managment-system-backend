@@ -9,6 +9,10 @@ const taskSchema = mongoose.Schema({
     type: String,
     required: true,
   },
+  company: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Company',
+  },
   project: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Project',

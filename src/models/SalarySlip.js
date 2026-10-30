@@ -6,6 +6,10 @@ const salarySlipSchema = mongoose.Schema({
     ref: 'User',
     required: true
   },
+  company: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Company',
+  },
   month: {
     type: Number, // 1-12
     required: true

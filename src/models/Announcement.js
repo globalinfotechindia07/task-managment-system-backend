@@ -6,6 +6,10 @@ const announcementSchema = new mongoose.Schema({
     required: true,
     trim: true
   },
+  company: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Company',
+  },
   content: {
     type: String,
     required: true

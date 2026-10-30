@@ -6,6 +6,10 @@ const notificationSchema = mongoose.Schema({
     ref: 'User',
     required: true,
   },
+  company: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Company',
+  },
   title: {
     type: String,
     required: true,

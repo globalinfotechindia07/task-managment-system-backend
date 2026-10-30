@@ -5,7 +5,15 @@ const Project = require('../models/Project');
 // @access  Private/Admin
 const getProjects = async (req, res) => {
   try {
-    const projects = await Project.find().sort({ createdAt: -1 });
+    const filter = {};
+    if (req.user.role !== 'Super Admin') {
+      const companyId = req.companyId || req.user.company?._id || req.user.company;
+      if (!companyId) return res.json([]);
+      filter.company = companyId;
+    } else if (req.query.company) {
+      filter.company = req.query.company;
+    }
+    const projects = await Project.find(filter).sort({ createdAt: -1 });
     res.json(projects);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -17,7 +25,7 @@ const getProjects = async (req, res) => {
 // @access  Private/Admin
 const createProject = async (req, res) => {
   try {
-    const { name, description, status, startDate, endDate } = req.body;
+    const { name, description, status, startDate, endDate, companyId } = req.body;
     
     let logo = '';
     if (req.file) {
@@ -30,7 +38,8 @@ const createProject = async (req, res) => {
       status,
       startDate,
       endDate,
-      logo
+      logo,
+      company: req.companyId || companyId
     });
 
     const createdProject = await project.save();

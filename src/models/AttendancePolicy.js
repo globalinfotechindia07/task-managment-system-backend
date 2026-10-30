@@ -1,6 +1,11 @@
 const mongoose = require('mongoose');
 
 const attendancePolicySchema = mongoose.Schema({
+  company: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Company',
+    unique: true,
+  },
   officeLatitude: {
     type: Number,
     required: true,
