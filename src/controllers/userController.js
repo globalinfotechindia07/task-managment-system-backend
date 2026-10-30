@@ -1,5 +1,6 @@
 const User = require('../models/User');
 const Company = require('../models/Company');
+const Role = require('../models/Role');
 
 // @desc    Get all users (Scoped to tenant office, or all if Super Admin)
 // @route   GET /api/users
@@ -19,27 +20,30 @@ const getUsers = async (req, res) => {
 
       // 2. Role-specific scoping inside the office:
       if (req.user.role === 'Admin' || req.user.role === 'CTO') {
-        // Office Admin manages their staff: HR Manager, Team Head, and Users (Employees)
-        if (req.query.role && ['HR Manager', 'Team Head', 'User'].includes(req.query.role)) {
+        // Office Admin manages all staff positions in their company
+        if (req.query.role && !['Admin', 'Super Admin'].includes(req.query.role)) {
           filter.role = req.query.role;
         } else {
-          // Strictly show staff roles (HR, Team Head, User). Do not expose other Admins or Super Admin
-          filter.role = { $in: ['HR Manager', 'Team Head', 'User'] };
+          // Exclude other platform/office admins from employee list
+          filter.role = { $nin: ['Admin', 'Super Admin'] };
         }
-      } else if (req.user.role === 'HR Manager') {
-        // HR only monitors employees under their office (Employees & Team Heads). Admins are strictly excluded
-        if (req.query.role && ['User', 'Team Head'].includes(req.query.role)) {
+      } else if (req.user.role === 'HR Manager' || req.user.role === 'HR') {
+        // HR only monitors staff under their office. Admins are strictly excluded
+        if (req.query.role && !['Admin', 'Super Admin'].includes(req.query.role)) {
           filter.role = req.query.role;
         } else {
-          filter.role = { $in: ['User', 'Team Head'] };
+          filter.role = { $nin: ['Admin', 'Super Admin'] };
         }
-      } else if (req.user.role === 'Team Head') {
+      } else if (req.user.role === 'Team Head' || req.user.role === 'Team Lead') {
         filter.$or = [
           { teamHead: req.user._id },
           { _id: req.user._id }
         ];
-      } else if (req.user.role === 'User') {
+      } else if (req.user.role === 'User' || req.user.role === 'Employee') {
         filter._id = req.user._id;
+      } else {
+        // Custom roles with 'users.view' permission
+        filter.role = { $nin: ['Admin', 'Super Admin'] };
       }
     } else if (req.query.company) {
       // Super Admin can filter by specific company if requested
@@ -52,7 +56,8 @@ const getUsers = async (req, res) => {
     const users = await User.find(filter)
       .select('-password')
       .populate('teamHead', 'name email')
-      .populate('company', 'name companyCode status');
+      .populate('company', 'name companyCode status')
+      .populate('roleRef', 'name displayName permissions');
 
     res.json(users);
   } catch (error) {
@@ -72,10 +77,10 @@ const createUser = async (req, res) => {
       return res.status(400).json({ message: 'User with this email already exists' });
     }
 
-    // Role validation: Non-Super Admin can only create HR Manager, Team Head, or User (Employee)
+    // Role validation: Non-Super Admin cannot create another Admin or Super Admin
     if (req.user.role !== 'Super Admin') {
-      if (!['HR Manager', 'Team Head', 'User'].includes(role)) {
-        return res.status(403).json({ message: 'You can only create HR Manager, Team Head, or User (Employee) roles' });
+      if (['Admin', 'Super Admin'].includes(role)) {
+        return res.status(403).json({ message: 'Cannot create Administrator or Super Admin accounts' });
       }
     }
 
@@ -109,17 +114,30 @@ const createUser = async (req, res) => {
       }
     }
 
+    // Find matching role document to attach roleRef
+    let roleRefId = req.body.roleRef;
+    if (!roleRefId && role && targetCompanyId) {
+      const foundRole = await Role.findOne({
+        company: targetCompanyId,
+        $or: [{ name: role }, { displayName: role }]
+      });
+      if (foundRole) {
+        roleRefId = foundRole._id;
+      }
+    }
+
     const user = await User.create({
       name,
       email,
       password,
       role,
+      roleRef: roleRefId,
       designation: designation || 'Staff',
       status: status || 'Active',
       company: targetCompanyId,
       createdBy: req.user._id,
-      department: role === 'User' ? department : undefined,
-      teamHead: role === 'User' ? (req.user.role === 'Team Head' ? req.user._id : teamHead) : undefined,
+      department: department || undefined,
+      teamHead: teamHead ? (typeof teamHead === 'object' ? teamHead._id : teamHead) : (req.user.role === 'Team Head' ? req.user._id : undefined),
     });
 
     if (user) {
@@ -128,6 +146,7 @@ const createUser = async (req, res) => {
         name: user.name,
         email: user.email,
         role: user.role,
+        roleRef: user.roleRef,
         designation: user.designation,
         status: user.status,
         company: user.company,
@@ -183,20 +202,34 @@ const updateUser = async (req, res) => {
     if (req.body.password) {
       user.password = req.body.password;
     }
-    user.role = req.body.role || user.role;
+
+    if (req.body.role) {
+      user.role = req.body.role;
+      if (req.body.roleRef) {
+        user.roleRef = req.body.roleRef;
+      } else {
+        const foundRole = await Role.findOne({
+          company: user.company,
+          $or: [{ name: req.body.role }, { displayName: req.body.role }]
+        });
+        if (foundRole) {
+          user.roleRef = foundRole._id;
+        }
+      }
+    }
+
     user.designation = req.body.designation || user.designation;
     user.status = req.body.status || user.status;
 
-    if (user.role === 'User') {
-      user.department = req.body.department || user.department || 'IT';
+    if (req.body.department !== undefined) {
+      user.department = req.body.department;
+    }
+    if (req.body.teamHead !== undefined) {
       let th = req.body.teamHead;
       if (th && typeof th === 'object' && th._id) {
         th = th._id;
       }
-      user.teamHead = th || user.teamHead || req.user._id;
-    } else {
-      user.department = undefined;
-      user.teamHead = undefined;
+      user.teamHead = th || undefined;
     }
 
     const updatedUser = await user.save();

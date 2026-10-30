@@ -6,15 +6,17 @@ const {
   updateProject,
   deleteProject
 } = require('../controllers/projectController');
-const { protect, authorizeRoles } = require('../middleware/authMiddleware');
+const { protect, authorizePermission } = require('../middleware/authMiddleware');
 const upload = require('../middleware/uploadMiddleware');
 
+router.use(protect);
+
 router.route('/')
-  .get(protect, authorizeRoles('Admin', 'Team Head', 'User', 'CTO', 'HR Manager'), getProjects)
-  .post(protect, authorizeRoles('Admin', 'CTO'), upload.single('logo'), createProject);
+  .get(authorizePermission('projects', 'view'), getProjects)
+  .post(authorizePermission('projects', 'create'), upload.single('logo'), createProject);
 
 router.route('/:id')
-  .put(protect, authorizeRoles('Admin', 'CTO'), upload.single('logo'), updateProject)
-  .delete(protect, authorizeRoles('Admin', 'CTO'), deleteProject);
+  .put(authorizePermission('projects', 'edit'), upload.single('logo'), updateProject)
+  .delete(authorizePermission('projects', 'delete'), deleteProject);
 
 module.exports = router;

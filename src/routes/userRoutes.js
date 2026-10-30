@@ -1,15 +1,16 @@
 const express = require('express');
 const router = express.Router();
 const { getUsers, createUser, updateUser, deleteUser } = require('../controllers/userController');
-const { protect, authorizeRoles } = require('../middleware/authMiddleware');
+const { protect, authorizePermission } = require('../middleware/authMiddleware');
 
-// Routes are protected and accessible by Admin, Team Head, HR Manager, CTO, and User
+router.use(protect);
+
 router.route('/')
-  .get(protect, authorizeRoles('Admin', 'Team Head', 'HR Manager', 'CTO', 'User'), getUsers)
-  .post(protect, authorizeRoles('Admin', 'Team Head', 'CTO'), createUser);
+  .get(authorizePermission('users', 'view'), getUsers)
+  .post(authorizePermission('users', 'create'), createUser);
 
 router.route('/:id')
-  .put(protect, authorizeRoles('Admin', 'Team Head', 'CTO'), updateUser)
-  .delete(protect, authorizeRoles('Admin'), deleteUser);
+  .put(authorizePermission('users', 'edit'), updateUser)
+  .delete(authorizePermission('users', 'delete'), deleteUser);
 
 module.exports = router;

@@ -1,5 +1,6 @@
 const User = require('../models/User');
 const jwt = require('jsonwebtoken');
+const { getUserPermissions } = require('../utils/roleDefaults');
 
 // Generate JWT
 const generateToken = (id) => {
@@ -37,6 +38,8 @@ const authUser = async (req, res) => {
         return res.status(403).json({ message: 'Your company/office account has been suspended. Please contact the platform admin.' });
       }
 
+      const permissions = await getUserPermissions(user);
+
       res.json({
         _id: user._id,
         name: user.name,
@@ -46,6 +49,7 @@ const authUser = async (req, res) => {
         company: user.company,
         profilePicture: user.profilePicture,
         requiresPasswordChange: user.requiresPasswordChange,
+        permissions,
         token: generateToken(user._id),
       });
     } else {
@@ -62,9 +66,10 @@ const authUser = async (req, res) => {
 // @route   GET /api/auth/profile
 // @access  Private
 const getUserProfile = async (req, res) => {
-  const user = await User.findById(req.user._id);
+  const user = await User.findById(req.user._id).populate('company');
 
   if (user) {
+    const permissions = await getUserPermissions(user);
     res.json({
       _id: user._id,
       name: user.name,
@@ -74,6 +79,7 @@ const getUserProfile = async (req, res) => {
       phone: user.phone,
       profilePicture: user.profilePicture,
       requiresPasswordChange: user.requiresPasswordChange,
+      permissions,
     });
   } else {
     res.status(404).json({ message: 'User not found' });

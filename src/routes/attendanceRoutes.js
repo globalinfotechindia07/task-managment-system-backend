@@ -8,7 +8,7 @@ const {
   getMyAttendance,
   getAllAttendance
 } = require('../controllers/attendanceController');
-const { protect, authorizeRoles } = require('../middleware/authMiddleware');
+const { protect, authorizePermission } = require('../middleware/authMiddleware');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
@@ -30,13 +30,17 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage });
 
-router.get('/policy', protect, getPolicy);
-router.put('/policy', protect, authorizeRoles('Admin', 'CTO', 'HR Manager', 'Team Head'), updatePolicy);
+router.use(protect);
 
-router.post('/punch-in', protect, upload.single('photo'), punchIn);
-router.post('/punch-out', protect, upload.single('photo'), punchOut);
-router.get('/my-report', protect, getMyAttendance);
+router.get('/policy', getPolicy);
+router.put('/policy', authorizePermission('attendance', 'edit'), updatePolicy);
 
-router.get('/all', protect, authorizeRoles('Admin', 'CTO', 'HR Manager', 'Team Head'), getAllAttendance);
+// Staff punch operations
+router.post('/punch-in', upload.single('photo'), punchIn);
+router.post('/punch-out', upload.single('photo'), punchOut);
+router.get('/my-report', getMyAttendance);
+
+// Office-wide attendance monitoring
+router.get('/all', authorizePermission('attendance', 'view'), getAllAttendance);
 
 module.exports = router;

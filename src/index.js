@@ -36,6 +36,7 @@ app.use('/api/payroll', require('./routes/payrollRoutes'));
 app.use('/api/companies', require('./routes/companyRoutes'));
 app.use('/api/plans', require('./routes/subscriptionPlanRoutes'));
 app.use('/api/site-content', require('./routes/siteContentRoutes'));
+app.use('/api/roles', require('./routes/roleRoutes'));
 
 // Serve static files for uploads
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));

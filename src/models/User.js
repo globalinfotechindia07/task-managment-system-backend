@@ -18,8 +18,11 @@ const userSchema = mongoose.Schema({
   role: {
     type: String,
     required: true,
-    enum: ['Super Admin', 'Admin', 'CTO', 'Team Head', 'HR Manager', 'User'],
     default: 'User',
+  },
+  roleRef: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Role'
   },
   company: {
     type: mongoose.Schema.Types.ObjectId,
@@ -43,17 +46,12 @@ const userSchema = mongoose.Schema({
   },
   department: {
     type: String,
-    required: function() {
-      return this.role === 'User';
-    }
+    default: 'General'
   },
-    teamHead: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'User',
-      required: function() {
-        return this.role === 'User';
-      }
-    },
+  teamHead: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
+  },
     pushSubscriptions: {
       type: Array,
       default: []

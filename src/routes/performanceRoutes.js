@@ -1,12 +1,10 @@
 const express = require('express');
 const router = express.Router();
 const { getPerformanceSummary, getUserPerformanceLogs } = require('../controllers/performanceController');
-const { protect, authorizeRoles } = require('../middleware/authMiddleware');
+const { protect, authorizePermission } = require('../middleware/authMiddleware');
 
 router.use(protect);
-
-// Only managers/admins can view these reports
-router.use(authorizeRoles('Admin', 'CTO', 'HR Manager', 'Team Head'));
+router.use(authorizePermission('performance', 'view'));
 
 router.get('/summary', getPerformanceSummary);
 router.get('/logs/:userId', getUserPerformanceLogs);

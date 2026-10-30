@@ -8,15 +8,18 @@ const {
   getMySlips,
   getAllSlips
 } = require('../controllers/payrollController');
-const { protect, authorizeRoles } = require('../middleware/authMiddleware');
+const { protect, authorizePermission } = require('../middleware/authMiddleware');
 
-router.get('/config/:userId', protect, authorizeRoles('Admin', 'CTO', 'HR Manager'), getConfig);
-router.post('/config', protect, authorizeRoles('Admin', 'CTO', 'HR Manager'), updateConfig);
-router.get('/my-config', protect, getMyConfig);
+router.use(protect);
 
-router.post('/generate', protect, authorizeRoles('Admin', 'CTO', 'HR Manager'), generateSalary);
+// Staff self-service salary slips
+router.get('/my-config', getMyConfig);
+router.get('/my-slips', getMySlips);
 
-router.get('/my-slips', protect, getMySlips);
-router.get('/all', protect, authorizeRoles('Admin', 'CTO', 'HR Manager'), getAllSlips);
+// Payroll management (Dynamic permission: payroll)
+router.get('/config/:userId', authorizePermission('payroll', 'view'), getConfig);
+router.post('/config', authorizePermission('payroll', 'edit'), updateConfig);
+router.post('/generate', authorizePermission('payroll', 'create'), generateSalary);
+router.get('/all', authorizePermission('payroll', 'view'), getAllSlips);
 
 module.exports = router;
