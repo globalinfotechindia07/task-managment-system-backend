@@ -509,9 +509,9 @@ const publicOnboardOffice = async (req, res) => {
       paidAt: new Date()
     });
 
-    // 7. Generate JWT token
+    // 7. Generate JWT token (Persistent enterprise session - 365 days)
     const token = jwt.sign({ id: adminUser._id }, process.env.JWT_SECRET || 'secret123', {
-      expiresIn: '30d'
+      expiresIn: '365d'
     });
 
     res.status(201).json({

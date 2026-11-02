@@ -2,10 +2,10 @@ const User = require('../models/User');
 const jwt = require('jsonwebtoken');
 const { getUserPermissions } = require('../utils/roleDefaults');
 
-// Generate JWT
+// Generate JWT (Persistent enterprise session - 365 days)
 const generateToken = (id) => {
   return jwt.sign({ id }, process.env.JWT_SECRET || 'secret123', {
-    expiresIn: '30d',
+    expiresIn: '365d',
   });
 };
 
