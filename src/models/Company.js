@@ -88,8 +88,28 @@ const companySchema = mongoose.Schema(
       },
       maxEmployees: {
         type: Number,
-        default: 20,
+        default: 15,
       },
+      extraUsersCount: {
+        type: Number,
+        default: 0,
+        min: 0,
+        max: 5,
+      },
+      extraUsersHistory: [
+        {
+          seatsAdded: { type: Number, default: 0 },
+          pricePerSeat: { type: Number, default: 0 },
+          amountPaid: { type: Number, default: 0 },
+          gstAmount: { type: Number, default: 0 },
+          invoiceNumber: { type: String, default: '' },
+          paymentId: { type: String, default: '' },
+          purchasedAt: {
+            type: Date,
+            default: Date.now,
+          },
+        },
+      ],
     },
     status: {
       type: String,

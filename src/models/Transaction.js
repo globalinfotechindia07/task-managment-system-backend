@@ -19,6 +19,10 @@ const transactionSchema = mongoose.Schema(
       type: String,
       required: true,
     },
+    description: {
+      type: String,
+      default: '',
+    },
     billingCycle: {
       type: String,
       default: 'monthly',

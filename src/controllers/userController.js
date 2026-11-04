@@ -105,11 +105,26 @@ const createUser = async (req, res) => {
       }
 
       const currentCount = await User.countDocuments({ company: targetCompanyId });
-      const maxLimit = company.subscription?.maxEmployees || 20;
+      const baseLimit = company.subscription?.maxEmployees || 15;
+      const extraUsers = company.subscription?.extraUsersCount || 0;
+      const totalAllowed = baseLimit + extraUsers;
 
-      if (maxLimit > 0 && currentCount >= maxLimit) {
+      if (totalAllowed > 0 && currentCount >= totalAllowed) {
+        const canAddMoreAddons = extraUsers < 5;
+        const remainingAddons = 5 - extraUsers;
+
+        const message = canAddMoreAddons
+          ? `User limit reached (${currentCount}/${totalAllowed}). Your plan allows ${baseLimit} users (${extraUsers} add-on active). You can add up to ${remainingAddons} more user seat(s) from Billing & Invoices or upgrade your plan.`
+          : `Maximum user limit reached (${currentCount}/${totalAllowed}) including all 5 add-on seats. To add more users, please upgrade your subscription plan from Billing & Invoices.`;
+
         return res.status(403).json({
-          message: `Employee limit of ${maxLimit} reached for this office plan. Please contact Super Admin to upgrade your subscription.`
+          message,
+          limitReached: true,
+          currentCount,
+          totalAllowed,
+          baseLimit,
+          extraUsers,
+          remainingAddons,
         });
       }
     }

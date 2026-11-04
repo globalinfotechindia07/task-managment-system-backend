@@ -10,7 +10,11 @@ const {
   updateCompany,
   updateSubscription,
   deleteCompany,
-  getPlatformStats
+  getPlatformStats,
+  purchaseExtraUsers,
+  upgradeCompanyPlan,
+  createCheckoutOrder,
+  getAllPlatformTransactions,
 } = require('../controllers/companyController');
 const { protect, authorizeRoles } = require('../middleware/authMiddleware');
 
@@ -22,9 +26,13 @@ router.use(protect);
 // Company Admin billing & transaction history
 router.get('/my-transactions', authorizeRoles('Admin', 'CTO'), getMyTransactions);
 router.get('/transactions/:id/invoice', authorizeRoles('Admin', 'CTO', 'Super Admin'), getTransactionInvoice);
+router.post('/create-checkout-order', authorizeRoles('Admin', 'CTO'), createCheckoutOrder);
+router.post('/purchase-extra-users', authorizeRoles('Admin', 'CTO'), purchaseExtraUsers);
+router.post('/upgrade-plan', authorizeRoles('Admin', 'CTO'), upgradeCompanyPlan);
 
-// Super Admin platform statistics
+// Super Admin platform statistics & global billing
 router.get('/platform/stats', authorizeRoles('Super Admin'), getPlatformStats);
+router.get('/platform/transactions', authorizeRoles('Super Admin'), getAllPlatformTransactions);
 
 // Register a new office + admin
 router.post('/register-office', authorizeRoles('Super Admin'), registerOffice);

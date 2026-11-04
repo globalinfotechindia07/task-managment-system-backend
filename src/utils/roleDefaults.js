@@ -10,7 +10,8 @@ const ALL_MODULES = [
   'announcements',
   'chat',
   'reports',
-  'settings'
+  'settings',
+  'crm',
 ];
 
 const FULL_ACCESS = {
