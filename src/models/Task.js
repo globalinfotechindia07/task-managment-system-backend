@@ -7,7 +7,7 @@ const taskSchema = mongoose.Schema({
   },
   description: {
     type: String,
-    required: true,
+    default: '',
   },
   company: {
     type: mongoose.Schema.Types.ObjectId,
@@ -17,6 +17,19 @@ const taskSchema = mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Project',
     required: true,
+  },
+  sprint: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Sprint',
+    default: null,
+  },
+  sprintDay: {
+    type: Number,
+    default: null,
+  },
+  scheduledDate: {
+    type: Date,
+    default: null,
   },
   status: {
     type: String,

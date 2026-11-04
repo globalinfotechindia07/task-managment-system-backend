@@ -14,10 +14,13 @@ const { logAudit } = require('../utils/auditLogger');
 const getTasks = async (req, res) => {
   try {
     const filter = {};
-    const { project, status, priority, assignedTo, myTasks } = req.query;
+    const { project, status, priority, assignedTo, myTasks, sprint } = req.query;
 
     if (project && project !== 'All') {
       filter.project = project;
+    }
+    if (sprint && sprint !== 'All') {
+      filter.sprint = sprint;
     }
     if (status && status !== 'All') {
       filter.status = status;
@@ -43,6 +46,7 @@ const getTasks = async (req, res) => {
 
     let tasks = await Task.find(filter)
       .populate('project', 'name status')
+      .populate('sprint', 'name sprintNumber status startDate endDate')
       .populate('assignedTo', 'name email role department')
       .populate('assignedBy', 'name email role')
       .sort({ createdAt: -1 });
@@ -60,7 +64,7 @@ const createTask = async (req, res) => {
   try {
     const { 
       title, description, project, assignedTo, startDate, dueDate, 
-      estimatedTimeDuration, priority, status 
+      estimatedTimeDuration, priority, status, sprint, sprintDay, scheduledDate 
     } = req.body;
 
     const attachments = req.files ? req.files.map(file => `/uploads/${file.filename}`) : [];
@@ -76,6 +80,9 @@ const createTask = async (req, res) => {
       description,
       company: req.companyId || req.body.companyId,
       project,
+      sprint: sprint || null,
+      sprintDay: sprintDay !== undefined && sprintDay !== null && sprintDay !== '' ? Number(sprintDay) : null,
+      scheduledDate: scheduledDate ? new Date(scheduledDate) : null,
       assignedTo,
       assignedBy: req.user._id,
       startDate: adjustedStartDate,

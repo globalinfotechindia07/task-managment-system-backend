@@ -41,6 +41,7 @@ app.use('/api/roles', require('./routes/roleRoutes'));
 app.use('/api/audit-logs', require('./routes/auditLogRoutes'));
 app.use('/api/tickets', require('./routes/ticketRoutes'));
 app.use('/api/crm', require('./routes/crmRoutes'));
+app.use('/api/sprints', require('./routes/sprintRoutes'));
 
 // Serve static files for uploads
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));

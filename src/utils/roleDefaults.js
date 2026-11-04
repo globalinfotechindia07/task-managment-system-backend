@@ -12,6 +12,7 @@ const ALL_MODULES = [
   'reports',
   'settings',
   'crm',
+  'sprints',
 ];
 
 const FULL_ACCESS = {
