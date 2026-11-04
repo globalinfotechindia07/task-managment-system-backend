@@ -20,6 +20,17 @@ const testimonialSchema = mongoose.Schema(
   { _id: false }
 );
 
+const faqItemSchema = mongoose.Schema(
+  {
+    question: { type: String, required: true, trim: true },
+    answer: { type: String, required: true, trim: true },
+    category: { type: String, default: 'General', trim: true },
+    isPublished: { type: Boolean, default: true },
+    order: { type: Number, default: 0 }
+  },
+  { timestamps: true }
+);
+
 const siteContentSchema = mongoose.Schema(
   {
     hero: {
@@ -184,6 +195,51 @@ You may cancel your subscription at any time. Your portal access will remain act
       razorpayKeySecret: { type: String, default: '' },
       isEnabled: { type: Boolean, default: false },
       currency: { type: String, default: 'INR' }
+    },
+    faqs: {
+      type: [faqItemSchema],
+      default: () => [
+        {
+          question: 'How does geofenced attendance tracking work?',
+          answer:
+            'Employees punch in and out using their mobile or laptop browser. The system verifies their GPS coordinates against the office location radius set by the administrator.',
+          category: 'Attendance & HR',
+          isPublished: true,
+          order: 1
+        },
+        {
+          question: 'Can I manage multiple office branches under one company?',
+          answer:
+            'Yes! The platform provides multi-branch segregation, allowing custom geofencing locations, department allocation, and unified corporate monitoring.',
+          category: 'Platform & Scaling',
+          isPublished: true,
+          order: 2
+        },
+        {
+          question: 'How are salary slips and statutory deductions generated?',
+          answer:
+            'Our automated payroll engine calculates Basic, HRA, PF (Provident Fund), ESIC, Professional Tax, and late penalty deductions dynamically with 1-click printable PDF generation.',
+          category: 'Payroll & Finance',
+          isPublished: true,
+          order: 3
+        },
+        {
+          question: 'How do subscription plan quotas and extra user seats work?',
+          answer:
+            'Each plan includes a base number of employee accounts. If your team grows, you can purchase add-on seats (up to 5 extra users) directly from Admin Billing without upgrading the entire tier.',
+          category: 'Billing & Plans',
+          isPublished: true,
+          order: 4
+        },
+        {
+          question: 'Is our company data strictly isolated and secure?',
+          answer:
+            'Yes, we use strict multi-tenant database isolation, 256-bit SSL encryption, granular role-based permissions, and immutable audit logs.',
+          category: 'Security & Privacy',
+          isPublished: true,
+          order: 5
+        }
+      ]
     }
   },
   { timestamps: true }

@@ -4,6 +4,7 @@ const crypto = require('crypto');
 const SubscriptionPlan = require('../models/SubscriptionPlan');
 const Notification = require('../models/Notification');
 const User = require('../models/User');
+const PublicInquiry = require('../models/PublicInquiry');
 
 // Helper to ensure a single singleton document exists
 const getOrCreateContent = async () => {
@@ -30,6 +31,9 @@ exports.getPublicContent = async (req, res) => {
       paymentPolicy: content.paymentPolicy,
       refundPolicy: content.refundPolicy,
       testimonials: content.testimonials,
+      faqs: (content.faqs || [])
+        .filter((f) => f.isPublished !== false)
+        .sort((a, b) => (a.order || 0) - (b.order || 0)),
       paymentGateway: {
         razorpayKeyId: content.paymentGateway?.razorpayKeyId || '',
         isEnabled: !!content.paymentGateway?.isEnabled,
@@ -63,7 +67,7 @@ exports.updateContent = async (req, res) => {
   try {
     let content = await getOrCreateContent();
     
-    const { hero, aboutUs, contactInfo, termsAndConditions, privacyPolicy, paymentPolicy, refundPolicy, testimonials, paymentGateway } = req.body;
+    const { hero, aboutUs, contactInfo, termsAndConditions, privacyPolicy, paymentPolicy, refundPolicy, testimonials, faqs, paymentGateway } = req.body;
 
     if (hero) content.hero = { ...content.hero.toObject(), ...hero };
     if (aboutUs) content.aboutUs = { ...content.aboutUs.toObject(), ...aboutUs };
@@ -97,6 +101,7 @@ exports.updateContent = async (req, res) => {
       };
     }
     if (testimonials) content.testimonials = testimonials;
+    if (faqs) content.faqs = faqs;
     if (paymentGateway) {
       let keyId = (paymentGateway.razorpayKeyId !== undefined ? paymentGateway.razorpayKeyId : content.paymentGateway?.razorpayKeyId || '').trim();
       let keySecret = (paymentGateway.razorpayKeySecret !== undefined ? paymentGateway.razorpayKeySecret : content.paymentGateway?.razorpayKeySecret || '').trim();
@@ -132,21 +137,199 @@ exports.submitInquiry = async (req, res) => {
       return res.status(400).json({ message: 'Name, email, and message are required' });
     }
 
-    // Notify Super Admin if any exists
+    // 1. Save to Database so Super Admin can view, search, reply and manage
+    const inquiry = await PublicInquiry.create({
+      name: name.trim(),
+      email: email.trim().toLowerCase(),
+      phone: (phone || '').trim(),
+      subject: (subject || '').trim() || 'General Enterprise Inquiry',
+      message: message.trim(),
+      ipAddress: req.ip || req.headers['x-forwarded-for'] || '',
+    });
+
+    // 2. Notify Super Admin
     const superAdmin = await User.findOne({ role: 'Super Admin' });
     if (superAdmin) {
       await Notification.create({
         user: superAdmin._id,
-        title: `New Inquiry from ${name}`,
+        title: `New Direct Inquiry from ${name}`,
         message: `${subject ? `[${subject}] ` : ''}${message.slice(0, 100)}... (${email})`,
-        link: '/super-admin/dashboard'
+        link: '/super-admin/cms?tab=inquiries'
       });
     }
 
-    res.json({ message: 'Thank you! Your inquiry has been received. Our team will contact you shortly.' });
+    res.json({
+      message: 'Thank you! Your inquiry has been received. Our team will contact you shortly.',
+      inquiryId: inquiry._id
+    });
   } catch (error) {
     console.error('Error submitting inquiry:', error);
     res.status(500).json({ message: 'Server error submitting inquiry' });
+  }
+};
+
+// ===================== SUPER ADMIN INQUIRY MANAGEMENT =====================
+
+// @desc    Get all landing page inquiries
+// @route   GET /api/site-content/inquiries
+// @access  Private (Super Admin)
+exports.getInquiries = async (req, res) => {
+  try {
+    const { status, search, page = 1, limit = 25 } = req.query;
+    const query = {};
+
+    if (status && status !== 'all') {
+      query.status = status;
+    }
+
+    if (search) {
+      query.$or = [
+        { name: { $regex: search, $options: 'i' } },
+        { email: { $regex: search, $options: 'i' } },
+        { phone: { $regex: search, $options: 'i' } },
+        { subject: { $regex: search, $options: 'i' } },
+        { message: { $regex: search, $options: 'i' } },
+      ];
+    }
+
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+    const [inquiries, total, unreadCount] = await Promise.all([
+      PublicInquiry.find(query).sort({ createdAt: -1 }).skip(skip).limit(parseInt(limit)),
+      PublicInquiry.countDocuments(query),
+      PublicInquiry.countDocuments({ status: 'unread' }),
+    ]);
+
+    res.json({
+      inquiries,
+      total,
+      unreadCount,
+      page: parseInt(page),
+      pages: Math.ceil(total / parseInt(limit)),
+    });
+  } catch (error) {
+    console.error('Error fetching inquiries:', error);
+    res.status(500).json({ message: 'Error fetching inquiries' });
+  }
+};
+
+// @desc    Update inquiry status or notes
+// @route   PATCH /api/site-content/inquiries/:id
+// @access  Private (Super Admin)
+exports.updateInquiryStatus = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status, notes } = req.body;
+
+    const inquiry = await PublicInquiry.findById(id);
+    if (!inquiry) {
+      return res.status(404).json({ message: 'Inquiry not found' });
+    }
+
+    if (status) inquiry.status = status;
+    if (notes !== undefined) inquiry.notes = notes;
+    if (status === 'contacted' && !inquiry.respondedAt) {
+      inquiry.respondedAt = new Date();
+    }
+
+    await inquiry.save();
+    res.json({ message: 'Inquiry updated successfully', inquiry });
+  } catch (error) {
+    console.error('Error updating inquiry:', error);
+    res.status(500).json({ message: 'Error updating inquiry' });
+  }
+};
+
+// @desc    Delete inquiry
+// @route   DELETE /api/site-content/inquiries/:id
+// @access  Private (Super Admin)
+exports.deleteInquiry = async (req, res) => {
+  try {
+    const { id } = req.params;
+    await PublicInquiry.findByIdAndDelete(id);
+    res.json({ message: 'Inquiry deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting inquiry:', error);
+    res.status(500).json({ message: 'Error deleting inquiry' });
+  }
+};
+
+// ===================== SUPER ADMIN FAQ CRUD =====================
+
+// @desc    Add a new FAQ
+// @route   POST /api/site-content/faqs
+// @access  Private (Super Admin)
+exports.addFaq = async (req, res) => {
+  try {
+    const { question, answer, category, isPublished, order } = req.body;
+
+    if (!question || !answer) {
+      return res.status(400).json({ message: 'Question and answer are required' });
+    }
+
+    const content = await getOrCreateContent();
+    const newFaq = {
+      question: question.trim(),
+      answer: answer.trim(),
+      category: (category || 'General').trim(),
+      isPublished: isPublished !== false,
+      order: Number(order) || content.faqs.length + 1,
+    };
+
+    content.faqs.push(newFaq);
+    await content.save();
+
+    res.status(201).json({
+      message: 'FAQ added successfully',
+      faqs: content.faqs,
+      faq: content.faqs[content.faqs.length - 1],
+    });
+  } catch (error) {
+    console.error('Error adding FAQ:', error);
+    res.status(500).json({ message: 'Error adding FAQ' });
+  }
+};
+
+// @desc    Update an existing FAQ
+// @route   PUT /api/site-content/faqs/:faqId
+// @access  Private (Super Admin)
+exports.updateFaq = async (req, res) => {
+  try {
+    const { faqId } = req.params;
+    const { question, answer, category, isPublished, order } = req.body;
+
+    const content = await getOrCreateContent();
+    const faq = content.faqs.id(faqId);
+    if (!faq) {
+      return res.status(404).json({ message: 'FAQ not found' });
+    }
+
+    if (question) faq.question = question.trim();
+    if (answer) faq.answer = answer.trim();
+    if (category) faq.category = category.trim();
+    if (isPublished !== undefined) faq.isPublished = Boolean(isPublished);
+    if (order !== undefined) faq.order = Number(order);
+
+    await content.save();
+    res.json({ message: 'FAQ updated successfully', faqs: content.faqs, faq });
+  } catch (error) {
+    console.error('Error updating FAQ:', error);
+    res.status(500).json({ message: 'Error updating FAQ' });
+  }
+};
+
+// @desc    Delete an FAQ
+// @route   DELETE /api/site-content/faqs/:faqId
+// @access  Private (Super Admin)
+exports.deleteFaq = async (req, res) => {
+  try {
+    const { faqId } = req.params;
+    const content = await getOrCreateContent();
+    content.faqs = content.faqs.filter((f) => f._id.toString() !== faqId);
+    await content.save();
+    res.json({ message: 'FAQ deleted successfully', faqs: content.faqs });
+  } catch (error) {
+    console.error('Error deleting FAQ:', error);
+    res.status(500).json({ message: 'Error deleting FAQ' });
   }
 };
 
