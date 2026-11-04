@@ -57,11 +57,16 @@ exports.punchIn = async (req, res) => {
     
     // Check Location
     if (policy.officeLatitude && policy.officeLongitude) {
+      const parsedLat = parseFloat(latitude);
+      const parsedLng = parseFloat(longitude);
+      if (isNaN(parsedLat) || isNaN(parsedLng)) {
+        return res.status(400).json({ message: 'GPS coordinates are required to verify office attendance radius.' });
+      }
       const distance = getDistance(
         parseFloat(policy.officeLatitude), 
         parseFloat(policy.officeLongitude), 
-        parseFloat(latitude), 
-        parseFloat(longitude)
+        parsedLat, 
+        parsedLng
       );
       
       if (distance > policy.allowedRadiusMeters) {
@@ -108,8 +113,8 @@ exports.punchIn = async (req, res) => {
       status,
       lateByMinutes,
       punchInLocation: {
-        latitude: parseFloat(latitude),
-        longitude: parseFloat(longitude)
+        latitude: !isNaN(parseFloat(latitude)) ? parseFloat(latitude) : null,
+        longitude: !isNaN(parseFloat(longitude)) ? parseFloat(longitude) : null,
       },
       punchInPhoto: photoPath
     });
@@ -198,6 +203,38 @@ exports.getAllAttendance = async (req, res) => {
       
     res.json(logs);
   } catch (error) {
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+exports.getTodayStatus = async (req, res) => {
+  try {
+    const today = new Date().toISOString().split('T')[0];
+    const attendance = await Attendance.findOne({ user: req.user._id, date: today });
+    
+    // Also fetch policy for shift time info
+    const policyFilter = req.companyId ? { company: req.companyId } : {};
+    const policy = await AttendancePolicy.findOne(policyFilter);
+
+    const now = new Date();
+    const currentHour = now.getHours();
+    // 7:00 AM to 11:00 AM window
+    const isMorningWindow = currentHour >= 7 && currentHour < 11;
+
+    return res.json({
+      date: today,
+      hasPunchedIn: !!attendance,
+      hasPunchedOut: !!attendance?.punchOut,
+      punchInTime: attendance?.punchIn || null,
+      punchOutTime: attendance?.punchOut || null,
+      status: attendance?.status || null,
+      shiftInTime: policy?.inTime || '09:30',
+      bufferMinutes: policy?.bufferMinutes || 15,
+      isMorningWindow,
+      serverTime: now
+    });
+  } catch (error) {
+    console.error('getTodayStatus error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 };

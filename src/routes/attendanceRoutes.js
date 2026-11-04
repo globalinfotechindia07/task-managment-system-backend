@@ -6,7 +6,8 @@ const {
   punchIn,
   punchOut,
   getMyAttendance,
-  getAllAttendance
+  getAllAttendance,
+  getTodayStatus,
 } = require('../controllers/attendanceController');
 const { protect, authorizePermission } = require('../middleware/authMiddleware');
 const multer = require('multer');
@@ -36,6 +37,7 @@ router.get('/policy', getPolicy);
 router.put('/policy', authorizePermission('attendance', 'edit'), updatePolicy);
 
 // Staff punch operations
+router.get('/today-status', getTodayStatus);
 router.post('/punch-in', upload.single('photo'), punchIn);
 router.post('/punch-out', upload.single('photo'), punchOut);
 router.get('/my-report', getMyAttendance);
