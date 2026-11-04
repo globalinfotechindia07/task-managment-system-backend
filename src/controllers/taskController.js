@@ -6,6 +6,7 @@ const { calculateTaskDueDate, adjustToWorkingHours } = require('../utils/timeCal
 const { sendRealTimeNotification, emitTaskUpdate } = require('../utils/socketService');
 const PerformanceLog = require('../models/PerformanceLog');
 const Notification = require('../models/Notification');
+const { logAudit } = require('../utils/auditLogger');
 
 // @desc    Get all tasks (with filters)
 // @route   GET /api/tasks
@@ -90,6 +91,15 @@ const createTask = async (req, res) => {
     });
 
     const createdTask = await task.save();
+
+    logAudit({
+      user: req.user,
+      action: 'TASK_CREATED',
+      category: 'WORK',
+      status: 'SUCCESS',
+      details: { title: createdTask.title, assignedTo, priority: createdTask.priority },
+      req,
+    });
     
     // Fetch assignee details to send email
     const assignedUser = await User.findById(assignedTo);
@@ -173,6 +183,15 @@ const updateTask = async (req, res) => {
         task.history.push(...historyLog);
         const updatedTask = await task.save();
         await updatedTask.populate('assignedTo assignedBy project');
+
+        logAudit({
+          user: req.user,
+          action: updates.status ? 'TASK_STATUS_CHANGED' : 'TASK_UPDATED',
+          category: 'WORK',
+          status: 'SUCCESS',
+          details: { title: updatedTask.title, updates },
+          req,
+        });
         
         // Notify the relevant party if status was updated
         if (updates.status) {

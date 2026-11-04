@@ -1,6 +1,7 @@
 const User = require('../models/User');
 const jwt = require('jsonwebtoken');
 const { getUserPermissions } = require('../utils/roleDefaults');
+const { logAudit } = require('../utils/auditLogger');
 
 // Generate JWT (Persistent enterprise session - 365 days)
 const generateToken = (id) => {
@@ -40,6 +41,17 @@ const authUser = async (req, res) => {
 
       const permissions = await getUserPermissions(user);
 
+      // Record successful user login audit
+      logAudit({
+        user,
+        company: user.company,
+        action: 'USER_LOGIN',
+        category: 'AUTH',
+        status: 'SUCCESS',
+        details: { email: user.email, role: user.role, name: user.name },
+        req,
+      });
+
       res.json({
         _id: user._id,
         name: user.name,
@@ -54,6 +66,17 @@ const authUser = async (req, res) => {
       });
     } else {
       console.log(`Password match failed or user not found`);
+
+      // Record failed login audit
+      logAudit({
+        action: 'LOGIN_FAILED',
+        category: 'AUTH',
+        status: 'WARNING',
+        statusCode: 401,
+        details: { email, reason: 'Invalid email or password' },
+        req,
+      });
+
       res.status(401).json({ message: 'Invalid email or password' });
     }
   } catch (error) {

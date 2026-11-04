@@ -19,6 +19,7 @@ app.use(express.urlencoded({ extended: false }));
 const path = require('path');
 const initMonthlyReportJob = require('./jobs/monthlyReportJob');
 const initMonthlyPayrollJob = require('./jobs/monthlyPayrollJob');
+const initAuditLogCleanupJob = require('./jobs/auditLogCleanupJob');
 
 // Routes
 app.use('/api/auth', require('./routes/authRoutes'));
@@ -37,15 +38,38 @@ app.use('/api/companies', require('./routes/companyRoutes'));
 app.use('/api/plans', require('./routes/subscriptionPlanRoutes'));
 app.use('/api/site-content', require('./routes/siteContentRoutes'));
 app.use('/api/roles', require('./routes/roleRoutes'));
+app.use('/api/audit-logs', require('./routes/auditLogRoutes'));
+app.use('/api/tickets', require('./routes/ticketRoutes'));
 
 // Serve static files for uploads
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
-// Error handler middleware (optional basic one)
+// Error handler middleware (auto-logs failed queries & exceptions to AuditLog)
+const { logAudit } = require('./utils/auditLogger');
+
 app.use((err, req, res, next) => {
-  const statusCode = res.statusCode ? res.statusCode : 500;
-  res.status(statusCode);
-  res.json({
+  const statusCode = res.statusCode && res.statusCode !== 200 ? res.statusCode : (err.statusCode || 500);
+
+  // Automatically record audit log for query / server errors
+  logAudit({
+    req,
+    action: err.name === 'MongoServerError' || err.name === 'CastError' || err.name === 'ValidationError'
+      ? 'QUERY_FAILED'
+      : 'API_ERROR',
+    category: err.name && err.name.includes('Mongo') ? 'DATABASE' : 'SYSTEM',
+    status: 'ERROR',
+    statusCode,
+    details: {
+      name: err.name,
+      message: err.message,
+      stack: process.env.NODE_ENV === 'production' ? null : err.stack,
+      body: req.body ? { ...req.body, password: req.body.password ? '***' : undefined } : null,
+      query: req.query,
+      params: req.params,
+    },
+  });
+
+  res.status(statusCode).json({
     message: err.message,
     stack: process.env.NODE_ENV === 'production' ? null : err.stack,
   });
@@ -63,6 +87,7 @@ initSocket(server);
 // Initialize Cron Jobs
 initMonthlyReportJob();
 initMonthlyPayrollJob();
+initAuditLogCleanupJob();
 
 const PORT = process.env.PORT || 5000;
 

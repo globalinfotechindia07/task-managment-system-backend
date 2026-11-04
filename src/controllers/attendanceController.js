@@ -1,5 +1,6 @@
 const AttendancePolicy = require('../models/AttendancePolicy');
 const Attendance = require('../models/Attendance');
+const { logAudit } = require('../utils/auditLogger');
 
 const getDistance = (lat1, lon1, lat2, lon2) => {
   const R = 6371e3; // metres
@@ -113,6 +114,15 @@ exports.punchIn = async (req, res) => {
       punchInPhoto: photoPath
     });
 
+    logAudit({
+      user: req.user,
+      action: 'ATTENDANCE_PUNCH_IN',
+      category: 'ATTENDANCE',
+      status: 'SUCCESS',
+      details: { status, lateByMinutes, date: today },
+      req,
+    });
+
     res.json(attendance);
   } catch (error) {
     console.error(error);
@@ -137,6 +147,15 @@ exports.punchOut = async (req, res) => {
     attendance.punchOutPhoto = photoPath;
     attendance.punchOut = new Date();
     await attendance.save();
+
+    logAudit({
+      user: req.user,
+      action: 'ATTENDANCE_PUNCH_OUT',
+      category: 'ATTENDANCE',
+      status: 'SUCCESS',
+      details: { date: today, punchOutTime: attendance.punchOut },
+      req,
+    });
 
     res.json(attendance);
   } catch (error) {

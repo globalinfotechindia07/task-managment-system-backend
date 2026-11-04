@@ -116,6 +116,21 @@ const initSocket = (server) => {
         io.to(toSocketId).emit('ice-candidate', payload);
       }
     });
+
+    // ==========================================
+    // Support Ticket Live Chat
+    // ==========================================
+    socket.on('join-ticket', (ticketId) => {
+      if (ticketId) {
+        socket.join(`ticket_${ticketId}`);
+      }
+    });
+
+    socket.on('leave-ticket', (ticketId) => {
+      if (ticketId) {
+        socket.leave(`ticket_${ticketId}`);
+      }
+    });
     // ==========================================
   });
 
@@ -159,11 +174,25 @@ const emitChatEvent = (userId, event, payload) => {
   }
 };
 
+const emitTicketMessage = (ticketId, message) => {
+  if (io && ticketId) {
+    io.to(`ticket_${ticketId}`).emit('ticket_message', message);
+  }
+};
+
+const emitTicketStatusUpdate = (ticketId, payload) => {
+  if (io && ticketId) {
+    io.to(`ticket_${ticketId}`).emit('ticket_status_update', payload);
+  }
+};
+
 module.exports = {
   initSocket,
   getIO,
   sendRealTimeNotification,
   emitTaskUpdate,
   sendRealTimeMessage,
-  emitChatEvent
+  emitChatEvent,
+  emitTicketMessage,
+  emitTicketStatusUpdate,
 };
