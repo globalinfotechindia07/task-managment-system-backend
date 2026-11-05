@@ -40,9 +40,11 @@ app.use('/api/site-content', require('./routes/siteContentRoutes'));
 app.use('/api/roles', require('./routes/roleRoutes'));
 app.use('/api/audit-logs', require('./routes/auditLogRoutes'));
 app.use('/api/tickets', require('./routes/ticketRoutes'));
+app.use('/api/company-tickets', require('./routes/companyTicketRoutes'));
 app.use('/api/crm', require('./routes/crmRoutes'));
 app.use('/api/sprints', require('./routes/sprintRoutes'));
 app.use('/api/integrations', require('./routes/integrationRoutes'));
+app.use('/api/software-support', require('./routes/softwareSupportRoutes'));
 
 // Serve static files for uploads
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
