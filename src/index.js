@@ -45,6 +45,9 @@ app.use('/api/crm', require('./routes/crmRoutes'));
 app.use('/api/sprints', require('./routes/sprintRoutes'));
 app.use('/api/integrations', require('./routes/integrationRoutes'));
 app.use('/api/software-support', require('./routes/softwareSupportRoutes'));
+app.use('/api/client-portal', require('./routes/clientPortalRoutes'));
+app.use('/api/accountant', require('./routes/accountantRoutes'));
+app.use('/api/leaves', require('./routes/leaveRoutes'));
 
 // Serve static files for uploads
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));

@@ -3,11 +3,11 @@ const mongoose = require('mongoose');
 const settingsSchema = mongoose.Schema({
   roles: {
     type: [String],
-    default: ['Admin', 'Team Head', 'HR Manager', 'User']
+    default: ['Admin', 'Team Head', 'HR Manager', 'Accountant', 'User']
   },
   designations: {
     type: [String],
-    default: ['System Administrator', 'HR Manager', 'Project Manager', 'Frontend Developer', 'Backend Developer']
+    default: ['System Administrator', 'HR Manager', 'Accountant', 'Project Manager', 'Frontend Developer', 'Backend Developer']
   },
   departments: {
     type: [String],
