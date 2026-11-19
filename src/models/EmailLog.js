@@ -1,6 +1,15 @@
 const mongoose = require('mongoose');
 
 const emailLogSchema = new mongoose.Schema({
+  company: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Company',
+    index: true,
+  },
+  from: {
+    type: String,
+    default: '',
+  },
   recipient: {
     type: String,
     required: true,
@@ -12,6 +21,11 @@ const emailLogSchema = new mongoose.Schema({
   body: {
     type: String,
     required: true,
+  },
+  senderType: {
+    type: String,
+    enum: ['CompanySMTP', 'GlobalSMTP', 'Fallback'],
+    default: 'GlobalSMTP',
   },
   status: {
     type: String,

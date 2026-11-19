@@ -20,6 +20,7 @@ const path = require('path');
 const initMonthlyReportJob = require('./jobs/monthlyReportJob');
 const initMonthlyPayrollJob = require('./jobs/monthlyPayrollJob');
 const initAuditLogCleanupJob = require('./jobs/auditLogCleanupJob');
+const initStickyNoteReminderJob = require('./jobs/stickyNoteReminderJob');
 
 // Routes
 app.use('/api/auth', require('./routes/authRoutes'));
@@ -48,6 +49,10 @@ app.use('/api/software-support', require('./routes/softwareSupportRoutes'));
 app.use('/api/client-portal', require('./routes/clientPortalRoutes'));
 app.use('/api/accountant', require('./routes/accountantRoutes'));
 app.use('/api/leaves', require('./routes/leaveRoutes'));
+app.use('/api/company/email-settings', require('./routes/companyEmailRoutes'));
+app.use('/api/offer-letters', require('./routes/offerLetterRoutes'));
+app.use('/api/sticky-notes', require('./routes/stickyNoteRoutes'));
+app.use('/api/documents', require('./routes/documentRoutes'));
 
 // Serve static files for uploads
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
@@ -96,6 +101,7 @@ initSocket(server);
 initMonthlyReportJob();
 initMonthlyPayrollJob();
 initAuditLogCleanupJob();
+initStickyNoteReminderJob();
 
 const PORT = process.env.PORT || 5000;
 

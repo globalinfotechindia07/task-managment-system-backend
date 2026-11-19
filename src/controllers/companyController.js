@@ -1278,6 +1278,138 @@ const getAllPlatformTransactions = async (req, res) => {
   }
 };
 
+// @desc    Get company letterhead & branding
+// @route   GET /api/companies/letterhead
+// @access  Private (All company employees)
+const getCompanyLetterhead = async (req, res) => {
+  try {
+    let companyId = req.companyId || req.user?.company?._id || req.user?.company;
+    if (req.user.role === 'Super Admin' && req.query.companyId) {
+      companyId = req.query.companyId;
+    }
+    if (!companyId) {
+      return res.status(404).json({ message: 'Company not found' });
+    }
+
+    const company = await Company.findById(companyId).select(
+      'name logo address location contactEmail phone gstNumber registrationNumber companyCode letterhead'
+    );
+    if (!company) {
+      return res.status(404).json({ message: 'Company not found' });
+    }
+
+    res.json({
+      companyId: company._id,
+      name: company.name,
+      logo: company.logo,
+      address: company.address,
+      location: company.location,
+      contactEmail: company.contactEmail,
+      phone: company.phone,
+      gstNumber: company.gstNumber,
+      registrationNumber: company.registrationNumber,
+      companyCode: company.companyCode,
+      letterhead: company.letterhead || {
+        url: '',
+        headerHeight: 130,
+        footerHeight: 80,
+        authorizedSignatoryName: '',
+        authorizedSignatoryDesignation: 'Authorized HR Signatory',
+        signatureUrl: '',
+        sealUrl: '',
+        showWatermark: false,
+        defaultOfferTerms: '',
+      },
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc    Update company letterhead & upload blank letterhead / sign / seal
+// @route   PUT /api/companies/letterhead
+// @access  Private (Admin, CTO, Super Admin)
+const updateCompanyLetterhead = async (req, res) => {
+  try {
+    let companyId = req.companyId || req.user?.company?._id || req.user?.company;
+    if (req.user.role === 'Super Admin' && req.query.companyId) {
+      companyId = req.query.companyId;
+    }
+    if (!companyId) {
+      return res.status(404).json({ message: 'Company not found' });
+    }
+
+    const company = await Company.findById(companyId);
+    if (!company) {
+      return res.status(404).json({ message: 'Company not found' });
+    }
+
+    if (!company.letterhead) {
+      company.letterhead = {};
+    }
+
+    // Check files uploaded via multer
+    if (req.files) {
+      if (req.files.letterhead && req.files.letterhead[0]) {
+        company.letterhead.url = `/uploads/${req.files.letterhead[0].filename}`;
+      }
+      if (req.files.signature && req.files.signature[0]) {
+        company.letterhead.signatureUrl = `/uploads/${req.files.signature[0].filename}`;
+      }
+      if (req.files.seal && req.files.seal[0]) {
+        company.letterhead.sealUrl = `/uploads/${req.files.seal[0].filename}`;
+      }
+    }
+
+    // Direct url updates if provided in json body
+    if (req.body.letterheadUrl !== undefined) company.letterhead.url = req.body.letterheadUrl;
+    if (req.body.signatureUrl !== undefined) company.letterhead.signatureUrl = req.body.signatureUrl;
+    if (req.body.sealUrl !== undefined) company.letterhead.sealUrl = req.body.sealUrl;
+
+    if (req.body.headerHeight !== undefined) company.letterhead.headerHeight = Number(req.body.headerHeight) || 130;
+    if (req.body.footerHeight !== undefined) company.letterhead.footerHeight = Number(req.body.footerHeight) || 80;
+    if (req.body.authorizedSignatoryName !== undefined) company.letterhead.authorizedSignatoryName = req.body.authorizedSignatoryName;
+    if (req.body.authorizedSignatoryDesignation !== undefined) company.letterhead.authorizedSignatoryDesignation = req.body.authorizedSignatoryDesignation;
+    if (req.body.showWatermark !== undefined) company.letterhead.showWatermark = req.body.showWatermark === 'true' || req.body.showWatermark === true;
+    if (req.body.defaultOfferTerms !== undefined) company.letterhead.defaultOfferTerms = req.body.defaultOfferTerms;
+
+    await company.save();
+
+    res.json({
+      message: 'Letterhead branding updated successfully',
+      letterhead: company.letterhead,
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc    Remove letterhead file (letterhead, signature, seal)
+// @route   DELETE /api/companies/letterhead/file/:type
+// @access  Private (Admin, CTO, Super Admin)
+const removeLetterheadFile = async (req, res) => {
+  try {
+    const { type } = req.params;
+    let companyId = req.companyId || req.user?.company?._id || req.user?.company;
+    if (req.user.role === 'Super Admin' && req.query.companyId) {
+      companyId = req.query.companyId;
+    }
+    const company = await Company.findById(companyId);
+    if (!company || !company.letterhead) {
+      return res.status(404).json({ message: 'Company letterhead not found' });
+    }
+
+    if (type === 'letterhead') company.letterhead.url = '';
+    else if (type === 'signature') company.letterhead.signatureUrl = '';
+    else if (type === 'seal') company.letterhead.sealUrl = '';
+
+    await company.save();
+    res.json({ message: `${type} removed successfully`, letterhead: company.letterhead });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 module.exports = {
   getCompanies,
   getCompany,
@@ -1293,4 +1425,7 @@ module.exports = {
   purchaseExtraUsers,
   upgradeCompanyPlan,
   getAllPlatformTransactions,
+  getCompanyLetterhead,
+  updateCompanyLetterhead,
+  removeLetterheadFile,
 };

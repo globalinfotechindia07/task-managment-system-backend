@@ -46,6 +46,23 @@ const salarySlipSchema = mongoose.Schema({
     type: Number,
     required: true
   },
+  salaryStructure: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'SalaryStructure'
+  },
+  dynamicEarnings: [{
+    name: String,
+    amount: Number
+  }],
+  dynamicDeductions: [{
+    name: String,
+    amount: Number,
+    payer: String
+  }],
+  dynamicEmployerContributions: [{
+    name: String,
+    amount: Number
+  }],
   stats: {
     totalDays: Number,
     workingDays: Number,

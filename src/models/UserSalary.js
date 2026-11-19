@@ -34,6 +34,22 @@ const userSalarySchema = mongoose.Schema({
     esic: { type: Number, default: 0 },
     labourWelfareFund: { type: Number, default: 0 },
     professionalTax: { type: Number, default: 0 }
+  },
+  salaryStructure: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'SalaryStructure'
+  },
+  dynamicComponents: [{
+    name: String,
+    type: { type: String, enum: ['Earning', 'Deduction', 'EmployerContribution'] },
+    calculationType: String,
+    value: Number,
+    amount: Number,
+    payer: String
+  }],
+  netMonthlyTakeHome: {
+    type: Number,
+    default: 0
   }
 }, { timestamps: true });
 

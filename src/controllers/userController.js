@@ -1,6 +1,7 @@
 const User = require('../models/User');
 const Company = require('../models/Company');
 const Role = require('../models/Role');
+const { sendWelcomeUserEmail } = require('../utils/emailService');
 
 // @desc    Get all users (Scoped to tenant office, or all if Super Admin)
 // @route   GET /api/users
@@ -156,6 +157,13 @@ const createUser = async (req, res) => {
     });
 
     if (user) {
+      // Fire-and-forget sending welcome email with credentials via company's configured SMTP
+      if (password && user.email) {
+        sendWelcomeUserEmail(user, password, targetCompanyId).catch((err) => {
+          console.error('Failed to dispatch welcome email via company SMTP:', err.message);
+        });
+      }
+
       res.status(201).json({
         _id: user._id,
         name: user.name,

@@ -15,13 +15,35 @@ const {
   upgradeCompanyPlan,
   createCheckoutOrder,
   getAllPlatformTransactions,
+  getCompanyLetterhead,
+  updateCompanyLetterhead,
+  removeLetterheadFile,
 } = require('../controllers/companyController');
 const { protect, authorizeRoles } = require('../middleware/authMiddleware');
+const upload = require('../middleware/uploadMiddleware');
 
 // Public self-service company onboarding & subscription
 router.post('/public-onboard', publicOnboardOffice);
 
 router.use(protect);
+
+// Company Letterhead & Document Branding (Must be before /:id routes)
+router.get('/letterhead', getCompanyLetterhead);
+router.put(
+  '/letterhead',
+  authorizeRoles('Admin', 'CTO', 'Super Admin'),
+  upload.fields([
+    { name: 'letterhead', maxCount: 1 },
+    { name: 'signature', maxCount: 1 },
+    { name: 'seal', maxCount: 1 },
+  ]),
+  updateCompanyLetterhead
+);
+router.delete(
+  '/letterhead/file/:type',
+  authorizeRoles('Admin', 'CTO', 'Super Admin'),
+  removeLetterheadFile
+);
 
 // Company Admin billing & transaction history
 router.get('/my-transactions', authorizeRoles('Admin', 'CTO'), getMyTransactions);

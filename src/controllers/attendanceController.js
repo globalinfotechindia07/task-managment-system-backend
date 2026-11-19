@@ -1,5 +1,6 @@
 const AttendancePolicy = require('../models/AttendancePolicy');
 const Attendance = require('../models/Attendance');
+const User = require('../models/User');
 const { logAudit } = require('../utils/auditLogger');
 
 const getDistance = (lat1, lon1, lat2, lon2) => {
@@ -236,5 +237,276 @@ exports.getTodayStatus = async (req, res) => {
   } catch (error) {
     console.error('getTodayStatus error:', error);
     res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// @desc    Get complete daily attendance of all staff for a specific date
+// @route   GET /api/attendance/daily-overview
+// @access  Private (Admin / HR with attendance view permission)
+exports.getDailyAttendanceOverview = async (req, res) => {
+  try {
+    const targetDate = req.query.date || new Date().toISOString().split('T')[0];
+
+    let companyId = req.companyId || req.user.company?._id || req.user.company;
+    if (req.user.role === 'Super Admin' && req.query.companyId) {
+      companyId = req.query.companyId;
+    }
+
+    const userFilter = { role: { $nin: ['Admin', 'Super Admin'] } };
+    if (companyId) {
+      userFilter.company = companyId;
+    }
+
+    const users = await User.find(userFilter)
+      .select('name email role designation department profilePicture')
+      .sort({ name: 1 });
+
+    const attendanceFilter = { date: targetDate };
+    if (companyId) attendanceFilter.company = companyId;
+
+    const attendances = await Attendance.find(attendanceFilter)
+      .populate('lastEditedBy', 'name email role')
+      .populate('editHistory.editedBy', 'name email role');
+
+    const attMap = {};
+    attendances.forEach((a) => {
+      attMap[a.user.toString()] = a;
+    });
+
+    // Also check LeaveRequest for approved leaves on this date
+    let leaveUserMap = {};
+    try {
+      const LeaveRequest = require('../models/LeaveRequest');
+      const approvedLeaves = await LeaveRequest.find({
+        company: companyId,
+        status: 'Approved',
+        startDate: { $lte: targetDate },
+        endDate: { $gte: targetDate },
+      });
+      approvedLeaves.forEach((l) => {
+        leaveUserMap[l.user.toString()] = l;
+      });
+    } catch (err) {
+      // ignore
+    }
+
+    let presentCount = 0;
+    let lateCount = 0;
+    let halfDayCount = 0;
+    let absentCount = 0;
+    let onLeaveCount = 0;
+    let editedCount = 0;
+
+    const list = users.map((u) => {
+      const att = attMap[u._id.toString()] || null;
+      const leave = leaveUserMap[u._id.toString()] || null;
+
+      let effectiveStatus = 'Absent';
+      if (att) {
+        effectiveStatus = att.status || 'Present';
+      } else if (leave) {
+        effectiveStatus = 'On Leave';
+      }
+
+      if (effectiveStatus === 'Present') presentCount++;
+      else if (effectiveStatus === 'Late') lateCount++;
+      else if (effectiveStatus === 'Half Day') halfDayCount++;
+      else if (effectiveStatus === 'On Leave') onLeaveCount++;
+      else absentCount++;
+
+      if (att?.isManuallyEdited) editedCount++;
+
+      return {
+        user: u,
+        attendance: att,
+        leaveDetails: leave ? { type: leave.leaveType, reason: leave.reason } : null,
+        status: effectiveStatus,
+        hasPunched: Boolean(att && att.punchIn),
+        punchIn: att?.punchIn || null,
+        punchOut: att?.punchOut || null,
+        lateByMinutes: att?.lateByMinutes || 0,
+        punchInPhoto: att?.punchInPhoto || null,
+        punchOutPhoto: att?.punchOutPhoto || null,
+        isManuallyEdited: att?.isManuallyEdited || false,
+        lastEditedBy: att?.lastEditedBy || null,
+        lastEditedAt: att?.lastEditedAt || null,
+        editRemarks: att?.editRemarks || '',
+        editHistory: att?.editHistory || [],
+      };
+    });
+
+    res.json({
+      success: true,
+      date: targetDate,
+      summary: {
+        totalStaff: users.length,
+        presentCount,
+        lateCount,
+        halfDayCount,
+        absentCount,
+        onLeaveCount,
+        editedCount,
+      },
+      records: list,
+    });
+  } catch (error) {
+    console.error('Error in getDailyAttendanceOverview:', error);
+    res.status(500).json({ message: 'Failed to fetch daily attendance', error: error.message });
+  }
+};
+
+// @desc    Manually edit or mark an employee's attendance record with audit tracking
+// @route   POST /api/attendance/manual-edit
+// @access  Private (Admin / HR with attendance edit permission)
+exports.editOrMarkAttendance = async (req, res) => {
+  try {
+    const { userId, date, status, punchIn, punchOut, reason } = req.body;
+
+    if (!userId || !date) {
+      return res.status(400).json({ message: 'User ID and date are required' });
+    }
+
+    if (!reason || !reason.trim()) {
+      return res.status(400).json({ message: 'A reason / remark for modifying attendance is mandatory' });
+    }
+
+    const companyId = req.companyId || req.user.company?._id || req.user.company;
+    const targetUser = await User.findById(userId);
+    if (!targetUser) {
+      return res.status(404).json({ message: 'Employee not found' });
+    }
+
+    let attendance = await Attendance.findOne({ user: userId, date });
+    const isNew = !attendance;
+
+    const previousState = {
+      status: attendance ? attendance.status : 'Absent / Not Punched',
+      punchIn: attendance?.punchIn || null,
+      punchOut: attendance?.punchOut || null,
+    };
+
+    let pIn = punchIn ? new Date(punchIn) : undefined;
+    let pOut = punchOut ? new Date(punchOut) : undefined;
+
+    if (status === 'Absent' || status === 'On Leave') {
+      if (!punchIn) pIn = null;
+      if (!punchOut) pOut = null;
+    } else if (!pIn && (!attendance || !attendance.punchIn)) {
+      const parsedDate = new Date(`${date}T09:30:00.000Z`);
+      pIn = parsedDate;
+    }
+
+    const newState = {
+      status: status || 'Present',
+      punchIn: pIn,
+      punchOut: pOut,
+    };
+
+    const editEntry = {
+      editedBy: req.user._id,
+      editedAt: new Date(),
+      reason: reason.trim(),
+      previousState,
+      newState,
+    };
+
+    if (isNew) {
+      attendance = await Attendance.create({
+        user: userId,
+        company: companyId || targetUser.company,
+        date,
+        punchIn: pIn,
+        punchOut: pOut,
+        status: status || 'Present',
+        isManuallyEdited: true,
+        lastEditedBy: req.user._id,
+        lastEditedAt: new Date(),
+        editRemarks: reason.trim(),
+        editHistory: [editEntry],
+      });
+    } else {
+      attendance.status = status || attendance.status;
+      if (pIn !== undefined) attendance.punchIn = pIn;
+      if (pOut !== undefined) attendance.punchOut = pOut;
+      attendance.isManuallyEdited = true;
+      attendance.lastEditedBy = req.user._id;
+      attendance.lastEditedAt = new Date();
+      attendance.editRemarks = reason.trim();
+      attendance.editHistory.push(editEntry);
+      await attendance.save();
+    }
+
+    await attendance.populate('lastEditedBy', 'name email role');
+    await attendance.populate('editHistory.editedBy', 'name email role');
+    await attendance.populate('user', 'name email designation department profilePicture');
+
+    logAudit({
+      req,
+      action: isNew ? 'ATTENDANCE_MANUALLY_MARKED' : 'ATTENDANCE_MANUALLY_EDITED',
+      category: 'ATTENDANCE',
+      status: 'SUCCESS',
+      details: {
+        targetUser: targetUser.name,
+        targetEmail: targetUser.email,
+        date,
+        previousStatus: previousState.status,
+        newStatus: status,
+        reason: reason.trim(),
+      },
+    });
+
+    res.json({
+      success: true,
+      message: `Attendance for ${targetUser.name} on ${date} has been updated.`,
+      attendance,
+    });
+  } catch (error) {
+    console.error('Error in editOrMarkAttendance:', error);
+    res.status(500).json({ message: 'Failed to update attendance', error: error.message });
+  }
+};
+
+// @desc    Get attendance audit trail / change history across the company
+// @route   GET /api/attendance/audit-logs
+// @access  Private (Admin / HR)
+exports.getAttendanceAuditLogs = async (req, res) => {
+  try {
+    let companyId = req.companyId || req.user.company?._id || req.user.company;
+    if (req.user.role === 'Super Admin' && req.query.companyId) {
+      companyId = req.query.companyId;
+    }
+
+    const filter = { isManuallyEdited: true };
+    if (companyId) filter.company = companyId;
+
+    const modifiedRecords = await Attendance.find(filter)
+      .populate('user', 'name email designation department profilePicture')
+      .populate('lastEditedBy', 'name email role')
+      .populate('editHistory.editedBy', 'name email role')
+      .sort({ lastEditedAt: -1, updatedAt: -1 })
+      .limit(100);
+
+    const logList = [];
+    modifiedRecords.forEach((rec) => {
+      (rec.editHistory || []).forEach((hist) => {
+        logList.push({
+          attendanceId: rec._id,
+          date: rec.date,
+          user: rec.user,
+          editedBy: hist.editedBy,
+          editedAt: hist.editedAt,
+          reason: hist.reason,
+          previousState: hist.previousState,
+          newState: hist.newState,
+        });
+      });
+    });
+
+    logList.sort((a, b) => new Date(b.editedAt) - new Date(a.editedAt));
+
+    res.json(logList.slice(0, 100));
+  } catch (error) {
+    console.error('Error in getAttendanceAuditLogs:', error);
+    res.status(500).json({ message: 'Failed to fetch attendance edit logs', error: error.message });
   }
 };

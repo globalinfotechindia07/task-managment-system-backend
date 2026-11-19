@@ -8,6 +8,9 @@ const {
   getMyAttendance,
   getAllAttendance,
   getTodayStatus,
+  getDailyAttendanceOverview,
+  editOrMarkAttendance,
+  getAttendanceAuditLogs,
 } = require('../controllers/attendanceController');
 const { protect, authorizePermission } = require('../middleware/authMiddleware');
 const multer = require('multer');
@@ -42,7 +45,10 @@ router.post('/punch-in', upload.single('photo'), punchIn);
 router.post('/punch-out', upload.single('photo'), punchOut);
 router.get('/my-report', getMyAttendance);
 
-// Office-wide attendance monitoring
+// Office-wide attendance monitoring & manual corrections
+router.get('/daily-overview', authorizePermission('attendance', 'view'), getDailyAttendanceOverview);
+router.post('/manual-edit', authorizePermission('attendance', 'edit'), editOrMarkAttendance);
+router.get('/audit-logs', authorizePermission('attendance', 'view'), getAttendanceAuditLogs);
 router.get('/all', authorizePermission('attendance', 'view'), getAllAttendance);
 
 module.exports = router;

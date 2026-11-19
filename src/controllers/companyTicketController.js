@@ -1,6 +1,7 @@
 const CompanyTicket = require('../models/CompanyTicket');
 const User = require('../models/User');
 const { logAudit } = require('../utils/auditLogger');
+const { sendEmail } = require('../utils/emailService');
 const {
   emitTicketMessage,
   emitTicketStatusUpdate,
@@ -115,6 +116,25 @@ const createCompanyTicket = async (req, res) => {
         type: 'ticket',
         link: '/company-support',
       });
+
+      if (assignedUser.email) {
+        sendEmail(
+          assignedUser.email,
+          `New Internal Ticket: ${ticketNumber} - ${subject}`,
+          `<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px;">
+            <h2 style="color: #4f46e5;">New Support Ticket Assigned</h2>
+            <p>Hello <strong>${assignedUser.name}</strong>,</p>
+            <p>A new internal support ticket has been raised and assigned to you by <strong>${req.user.name}</strong>.</p>
+            <div style="background-color: #f8fafc; padding: 15px; border-radius: 6px; margin: 15px 0;">
+              <p><strong>Ticket ID:</strong> ${ticketNumber}</p>
+              <p><strong>Category:</strong> ${category || 'Issue'}</p>
+              <p><strong>Priority:</strong> ${priority || 'Medium'}</p>
+              <p style="white-space: pre-wrap; color: #334155;">${description.trim()}</p>
+            </div>
+          </div>`,
+          { companyId: targetCompanyId }
+        ).catch(() => {});
+      }
     }
 
     // Audit Log

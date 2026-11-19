@@ -20,7 +20,7 @@ const notificationSchema = mongoose.Schema({
   },
   type: {
     type: String,
-    enum: ['task_assigned', 'task_updated', 'comment_added', 'report_added', 'system'],
+    enum: ['task_assigned', 'task_updated', 'comment_added', 'report_added', 'system', 'sticky_note_reminder', 'reminder'],
     default: 'system',
   },
   link: {

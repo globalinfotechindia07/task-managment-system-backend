@@ -116,6 +116,101 @@ const companySchema = mongoose.Schema(
       enum: ['Active', 'Inactive', 'Suspended'],
       default: 'Active',
     },
+    smtpSettings: {
+      enabled: {
+        type: Boolean,
+        default: false,
+      },
+      host: {
+        type: String,
+        default: '',
+        trim: true,
+      },
+      port: {
+        type: Number,
+        default: 587,
+      },
+      secure: {
+        type: Boolean,
+        default: false,
+      },
+      auth: {
+        user: {
+          type: String,
+          default: '',
+          trim: true,
+        },
+        pass: {
+          type: String,
+          default: '',
+          trim: true,
+        },
+      },
+      fromName: {
+        type: String,
+        default: '',
+        trim: true,
+      },
+      fromEmail: {
+        type: String,
+        default: '',
+        trim: true,
+      },
+      tlsRejectUnauthorized: {
+        type: Boolean,
+        default: false,
+      },
+      lastTestedAt: {
+        type: Date,
+      },
+      lastTestStatus: {
+        type: String,
+        enum: ['Success', 'Failed', 'None'],
+        default: 'None',
+      },
+      lastTestError: {
+        type: String,
+        default: '',
+      },
+    },
+    letterhead: {
+      url: {
+        type: String,
+        default: '', // uploaded blank letterhead image URL/path
+      },
+      headerHeight: {
+        type: Number,
+        default: 130, // px height reserved for header graphics
+      },
+      footerHeight: {
+        type: Number,
+        default: 80, // px height reserved for footer graphics
+      },
+      authorizedSignatoryName: {
+        type: String,
+        default: '',
+      },
+      authorizedSignatoryDesignation: {
+        type: String,
+        default: 'Authorized HR Signatory',
+      },
+      signatureUrl: {
+        type: String,
+        default: '', // transparent PNG signature
+      },
+      sealUrl: {
+        type: String,
+        default: '', // transparent PNG company stamp
+      },
+      showWatermark: {
+        type: Boolean,
+        default: false,
+      },
+      defaultOfferTerms: {
+        type: String,
+        default: '',
+      },
+    },
   },
   {
     timestamps: true,

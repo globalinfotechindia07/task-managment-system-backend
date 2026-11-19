@@ -14,6 +14,7 @@ const ALL_MODULES = [
   'crm',
   'sprints',
   'integrations',
+  'documents',
 ];
 
 const FULL_ACCESS = {
@@ -54,7 +55,8 @@ const DEFAULT_ROLES = {
       announcements: { view: true, create: true, edit: true, delete: true },
       chat: { view: true, create: true, edit: false, delete: false },
       reports: { view: true, create: false, edit: false, delete: false },
-      settings: { view: false, create: false, edit: false, delete: false }
+      settings: { view: false, create: false, edit: false, delete: false },
+      documents: { view: true, create: true, edit: true, delete: false }
     }
   },
   'Team Head': {
@@ -71,7 +73,8 @@ const DEFAULT_ROLES = {
       announcements: { view: true, create: false, edit: false, delete: false },
       chat: { view: true, create: true, edit: false, delete: false },
       reports: { view: true, create: true, edit: true, delete: false },
-      settings: { view: false, create: false, edit: false, delete: false }
+      settings: { view: false, create: false, edit: false, delete: false },
+      documents: { view: true, create: false, edit: false, delete: false }
     }
   },
   'User': {
@@ -88,7 +91,8 @@ const DEFAULT_ROLES = {
       announcements: { view: true, create: false, edit: false, delete: false },
       chat: { view: true, create: true, edit: false, delete: false },
       reports: { view: true, create: true, edit: false, delete: false },
-      settings: { view: false, create: false, edit: false, delete: false }
+      settings: { view: false, create: false, edit: false, delete: false },
+      documents: { view: true, create: true, edit: false, delete: false }
     }
   },
   'Accountant': {
@@ -105,7 +109,8 @@ const DEFAULT_ROLES = {
       announcements: { view: true, create: false, edit: false, delete: false },
       chat: { view: true, create: true, edit: false, delete: false },
       reports: { view: true, create: false, edit: false, delete: false },
-      settings: { view: false, create: false, edit: false, delete: false }
+      settings: { view: false, create: false, edit: false, delete: false },
+      documents: { view: true, create: false, edit: false, delete: false }
     }
   }
 };
