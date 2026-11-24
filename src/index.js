@@ -55,6 +55,7 @@ app.use('/api/sticky-notes', require('./routes/stickyNoteRoutes'));
 app.use('/api/documents', require('./routes/documentRoutes'));
 app.use('/api/time-sessions', require('./routes/timeSessionRoutes'));
 app.use('/api/backup', require('./routes/backupRoutes'));
+app.use('/api/reports-center', require('./routes/reportExportRoutes'));
 
 // Serve static files for uploads
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));

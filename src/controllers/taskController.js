@@ -38,10 +38,42 @@ const getTasks = async (req, res) => {
       filter.company = req.query.company;
     }
 
-    if (myTasks === 'true') {
-      filter.assignedTo = req.user._id;
-    } else if (assignedTo && assignedTo !== 'All') {
-      filter.assignedTo = assignedTo;
+    // Role-based task visibility:
+    const userRole = (req.user.role || '').toLowerCase();
+    const isAdmin = ['admin', 'super admin', 'cto'].includes(userRole);
+    const isTeamLead = userRole === 'team head' || userRole === 'team lead' || userRole.includes('lead') || userRole.includes('head');
+
+    if (!isAdmin) {
+      if (isTeamLead) {
+        if (myTasks === 'true') {
+          filter.assignedTo = req.user._id;
+        } else if (assignedTo && assignedTo !== 'All') {
+          filter.assignedTo = assignedTo;
+        } else {
+          const teamMemberDocs = await User.find({ teamHead: req.user._id }).select('_id');
+          const teamMemberIds = teamMemberDocs.map((u) => u._id);
+          filter.$or = [
+            { assignedTo: { $in: [...teamMemberIds, req.user._id] } },
+            { assignedBy: req.user._id }
+          ];
+        }
+      } else {
+        // Regular user: strictly see own tasks (assigned to self or created by self)
+        if (myTasks === 'true' || !assignedTo || assignedTo === 'All') {
+          filter.$or = [
+            { assignedTo: req.user._id },
+            { assignedBy: req.user._id }
+          ];
+        } else {
+          filter.assignedTo = req.user._id;
+        }
+      }
+    } else {
+      if (myTasks === 'true') {
+        filter.assignedTo = req.user._id;
+      } else if (assignedTo && assignedTo !== 'All') {
+        filter.assignedTo = assignedTo;
+      }
     }
 
     let tasks = await Task.find(filter)
@@ -95,6 +127,44 @@ const createTask = async (req, res) => {
       finalEstimatedHours = Number((finalTargetMinutes / 60).toFixed(2));
     }
 
+    // Assignment authorization check:
+    const userRole = (req.user.role || '').toLowerCase();
+    const isAdmin = ['admin', 'super admin', 'cto'].includes(userRole);
+    const isTeamLead = userRole === 'team head' || userRole === 'team lead' || userRole.includes('lead') || userRole.includes('head');
+
+    let finalAssignedTo = assignedTo;
+
+    if (!isAdmin && !isTeamLead) {
+      // Regular user: can ONLY assign to themselves!
+      if (finalAssignedTo && finalAssignedTo.toString() !== req.user._id.toString()) {
+        return res.status(403).json({
+          message: 'Access Denied: Regular users can only create and assign tasks to themselves.',
+        });
+      }
+      finalAssignedTo = req.user._id;
+    } else if (isTeamLead) {
+      // Team Lead: can assign to themselves OR users reporting directly under them
+      if (!finalAssignedTo || finalAssignedTo.toString() === req.user._id.toString()) {
+        finalAssignedTo = req.user._id;
+      } else {
+        const targetUser = await User.findById(finalAssignedTo);
+        if (!targetUser) {
+          return res.status(404).json({ message: 'Target assignee user not found' });
+        }
+        const reportsToLead = targetUser.teamHead && targetUser.teamHead.toString() === req.user._id.toString();
+        if (!reportsToLead) {
+          return res.status(403).json({
+            message: `Access Denied: Team Leads can only assign tasks to team members reporting directly under them. "${targetUser.name}" is not in your team.`,
+          });
+        }
+      }
+    } else {
+      // Admin / Super Admin / CTO: can assign to any user, or self if empty
+      if (!finalAssignedTo) {
+        finalAssignedTo = req.user._id;
+      }
+    }
+
     const task = new Task({
       title,
       description,
@@ -103,7 +173,7 @@ const createTask = async (req, res) => {
       sprint: sprint || null,
       sprintDay: sprintDay !== undefined && sprintDay !== null && sprintDay !== '' ? Number(sprintDay) : null,
       scheduledDate: scheduledDate ? new Date(scheduledDate) : null,
-      assignedTo,
+      assignedTo: finalAssignedTo,
       assignedBy: req.user._id,
       startDate: adjustedStartDate,
       dueDate: calculatedDueDate,
@@ -176,6 +246,33 @@ const updateTask = async (req, res) => {
 
     if (task) {
       const updates = req.body;
+
+      // Assignment permission check if assignedTo is updated
+      if (updates.assignedTo !== undefined && updates.assignedTo !== task.assignedTo?.toString()) {
+        const userRole = (req.user.role || '').toLowerCase();
+        const isAdmin = ['admin', 'super admin', 'cto'].includes(userRole);
+        const isTeamLead = userRole === 'team head' || userRole === 'team lead' || userRole.includes('lead') || userRole.includes('head');
+
+        if (!isAdmin && !isTeamLead) {
+          if (updates.assignedTo && updates.assignedTo.toString() !== req.user._id.toString()) {
+            return res.status(403).json({
+              message: 'Access Denied: Regular users cannot reassign tasks to other employees.',
+            });
+          }
+          updates.assignedTo = req.user._id;
+        } else if (isTeamLead) {
+          if (updates.assignedTo && updates.assignedTo.toString() !== req.user._id.toString()) {
+            const targetUser = await User.findById(updates.assignedTo);
+            const reportsToLead = targetUser?.teamHead && targetUser.teamHead.toString() === req.user._id.toString();
+            if (!reportsToLead) {
+              return res.status(403).json({
+                message: 'Access Denied: Team Leads can only reassign tasks to members of their team.',
+              });
+            }
+          }
+        }
+      }
+
       const historyLog = [];
 
       ['title', 'description', 'startDate', 'dueDate', 'estimatedTimeDuration', 'priority', 'status', 'assignedTo', 'targetDurationMinutes', 'timeTrackingMode', 'isTimerRequired'].forEach(field => {

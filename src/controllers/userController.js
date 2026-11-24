@@ -20,7 +20,8 @@ const getUsers = async (req, res) => {
       filter.company = companyId;
 
       // 2. Role-specific scoping inside the office:
-      if (req.user.role === 'Admin' || req.user.role === 'CTO') {
+      const roleLower = (req.user.role || '').toLowerCase();
+      if (roleLower === 'admin' || roleLower === 'cto') {
         // Office Admin manages all staff positions in their company
         if (req.query.role && !['Admin', 'Super Admin'].includes(req.query.role)) {
           filter.role = req.query.role;
@@ -28,19 +29,19 @@ const getUsers = async (req, res) => {
           // Exclude other platform/office admins from employee list
           filter.role = { $nin: ['Admin', 'Super Admin'] };
         }
-      } else if (req.user.role === 'HR Manager' || req.user.role === 'HR') {
+      } else if (roleLower === 'hr manager' || roleLower === 'hr' || roleLower.includes('human resource')) {
         // HR only monitors staff under their office. Admins are strictly excluded
         if (req.query.role && !['Admin', 'Super Admin'].includes(req.query.role)) {
           filter.role = req.query.role;
         } else {
           filter.role = { $nin: ['Admin', 'Super Admin'] };
         }
-      } else if (req.user.role === 'Team Head' || req.user.role === 'Team Lead') {
+      } else if (roleLower === 'team head' || roleLower === 'team lead' || roleLower.includes('lead') || roleLower.includes('head')) {
         filter.$or = [
           { teamHead: req.user._id },
           { _id: req.user._id }
         ];
-      } else if (req.user.role === 'User' || req.user.role === 'Employee') {
+      } else if (roleLower === 'user' || roleLower === 'employee' || roleLower.includes('staff')) {
         filter._id = req.user._id;
       } else {
         // Custom roles with 'users.view' permission

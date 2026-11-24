@@ -96,7 +96,7 @@ const startSession = async (req, res) => {
 
       // Permission check: assigned user, Admin/Manager, or task creator
       const userRole = (req.user.role || '').toLowerCase();
-      const isAdmin = ['admin', 'super admin', 'cto'].includes(userRole);
+      const isAdmin = ['admin', 'super admin', 'cto'].includes(userRole) || userRole.includes('lead') || userRole.includes('head');
       const assignedId = taskDoc.assignedTo?._id
         ? taskDoc.assignedTo._id.toString()
         : taskDoc.assignedTo
@@ -219,7 +219,7 @@ const pauseSession = async (req, res) => {
 
     // User check: assigned user, session owner, or Admin
     const userRole = (req.user.role || '').toLowerCase();
-    const isAdmin = ['admin', 'super admin', 'cto'].includes(userRole);
+    const isAdmin = ['admin', 'super admin', 'cto'].includes(userRole) || userRole.includes('lead') || userRole.includes('head');
     const isOwner = session.user.toString() === req.user._id.toString();
     let isTaskAssignee = false;
     if (session.task) {
@@ -302,7 +302,7 @@ const resumeSession = async (req, res) => {
 
     // User check: assigned user, session owner, or Admin
     const userRole = (req.user.role || '').toLowerCase();
-    const isAdmin = ['admin', 'super admin', 'cto'].includes(userRole);
+    const isAdmin = ['admin', 'super admin', 'cto'].includes(userRole) || userRole.includes('lead') || userRole.includes('head');
     const isOwner = session.user.toString() === req.user._id.toString();
     let isTaskAssignee = false;
     if (session.task) {
@@ -399,7 +399,7 @@ const endSession = async (req, res) => {
 
     // User check: assigned user, session owner, or Admin
     const userRole = (req.user.role || '').toLowerCase();
-    const isAdmin = ['admin', 'super admin', 'cto'].includes(userRole);
+    const isAdmin = ['admin', 'super admin', 'cto'].includes(userRole) || userRole.includes('lead') || userRole.includes('head');
     const isOwner = session.user.toString() === req.user._id.toString();
     let isTaskAssignee = false;
     if (session.task) {
@@ -908,7 +908,7 @@ const startTaskTimer = async (req, res) => {
 
     // Permission check: assigned user, task creator, or Admin/Manager
     const userRole = (req.user.role || '').toLowerCase();
-    const isAdmin = ['admin', 'super admin', 'cto'].includes(userRole);
+    const isAdmin = ['admin', 'super admin', 'cto'].includes(userRole) || userRole.includes('lead') || userRole.includes('head');
     const assignedId = task.assignedTo?._id ? task.assignedTo._id.toString() : task.assignedTo ? task.assignedTo.toString() : null;
     const isAssignee = Boolean(assignedId && assignedId === req.user._id.toString());
     const isAssigner = Boolean(task.assignedBy && (task.assignedBy._id || task.assignedBy).toString() === req.user._id.toString());
@@ -1020,7 +1020,7 @@ const getTaskTimerStatus = async (req, res) => {
     const assignedId = task.assignedTo?._id ? task.assignedTo._id.toString() : task.assignedTo?.toString();
     const isAssignedToMe = Boolean(assignedId && assignedId === req.user._id.toString());
     const userRole = (req.user.role || '').toLowerCase();
-    const isAdmin = ['admin', 'super admin', 'cto'].includes(userRole);
+    const isAdmin = ['admin', 'super admin', 'cto'].includes(userRole) || userRole.includes('lead') || userRole.includes('head');
     const isAssigner = Boolean(task.assignedBy && (task.assignedBy._id || task.assignedBy).toString() === req.user._id.toString());
     const canControlTimer = isAssignedToMe || isAdmin || isAssigner;
 
