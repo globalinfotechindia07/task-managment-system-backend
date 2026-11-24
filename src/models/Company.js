@@ -211,6 +211,25 @@ const companySchema = mongoose.Schema(
         default: '',
       },
     },
+    autoBackup: {
+      enabled: {
+        type: Boolean,
+        default: true,
+      },
+      frequency: {
+        type: String,
+        enum: ['daily', 'weekly', 'biweekly', 'monthly'],
+        default: 'weekly',
+      },
+      lastAutoBackupAt: {
+        type: Date,
+        default: null,
+      },
+      lastBackupAt: {
+        type: Date,
+        default: null,
+      },
+    },
   },
   {
     timestamps: true,

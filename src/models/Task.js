@@ -58,6 +58,28 @@ const taskSchema = mongoose.Schema({
   estimatedTimeDuration: {
     type: Number, // In hours
   },
+  targetDurationMinutes: {
+    type: Number,
+    default: 0,
+  },
+  timeTrackingMode: {
+    type: String,
+    enum: ['stopwatch', 'timeline'],
+    default: 'stopwatch',
+  },
+  isTimerRequired: {
+    type: Boolean,
+    default: true,
+  },
+  totalLoggedSeconds: {
+    type: Number,
+    default: 0,
+  },
+  activeTimeSession: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'TimeSession',
+    default: null,
+  },
   priority: {
     type: String,
     enum: ['High', 'Medium', 'Normal'],

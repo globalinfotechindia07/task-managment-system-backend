@@ -185,6 +185,7 @@ exports.createStickyNote = async (req, res) => {
       reminderAt,
       sendEmailReminder,
       sendInAppReminder,
+      position,
     } = req.body;
 
     if (!content || !content.trim()) {
@@ -214,6 +215,12 @@ exports.createStickyNote = async (req, res) => {
       reminderSent: false,
       sendEmailReminder: sendEmailReminder !== undefined ? Boolean(sendEmailReminder) : true,
       sendInAppReminder: sendInAppReminder !== undefined ? Boolean(sendInAppReminder) : true,
+      position: position && typeof position === 'object' ? {
+        x: typeof position.x === 'number' ? Math.round(position.x) : null,
+        y: typeof position.y === 'number' ? Math.round(position.y) : null,
+        zIndex: typeof position.zIndex === 'number' ? position.zIndex : 1,
+        rotation: typeof position.rotation === 'number' ? position.rotation : 0,
+      } : { x: null, y: null, zIndex: 1, rotation: 0 },
     });
 
     res.status(201).json({
@@ -249,6 +256,7 @@ exports.updateStickyNote = async (req, res) => {
       reminderAt,
       sendEmailReminder,
       sendInAppReminder,
+      position,
     } = req.body;
 
     if (title !== undefined) note.title = title.trim();
@@ -264,6 +272,14 @@ exports.updateStickyNote = async (req, res) => {
     }
     if (sendEmailReminder !== undefined) note.sendEmailReminder = Boolean(sendEmailReminder);
     if (sendInAppReminder !== undefined) note.sendInAppReminder = Boolean(sendInAppReminder);
+    if (position && typeof position === 'object') {
+      note.position = {
+        x: typeof position.x === 'number' ? Math.round(position.x) : note.position?.x ?? null,
+        y: typeof position.y === 'number' ? Math.round(position.y) : note.position?.y ?? null,
+        zIndex: typeof position.zIndex === 'number' ? position.zIndex : note.position?.zIndex ?? 1,
+        rotation: typeof position.rotation === 'number' ? position.rotation : note.position?.rotation ?? 0,
+      };
+    }
 
     if (reminderAt !== undefined) {
       if (reminderAt) {
@@ -410,6 +426,62 @@ exports.testReminder = async (req, res) => {
   } catch (error) {
     console.error('Error testing reminder:', error);
     res.status(500).json({ message: 'Failed to dispatch test reminder', error: error.message });
+  }
+};
+
+// @desc    Update single note position
+// @route   PATCH /api/sticky-notes/:id/position
+// @access  Private (Owner only)
+exports.updatePosition = async (req, res) => {
+  try {
+    const { x, y, zIndex, rotation } = req.body;
+    const note = await StickyNote.findOne({ _id: req.params.id, user: req.user._id });
+    if (!note) {
+      return res.status(404).json({ message: 'Sticky note not found' });
+    }
+
+    note.position = {
+      x: typeof x === 'number' ? Math.round(x) : note.position?.x ?? null,
+      y: typeof y === 'number' ? Math.round(y) : note.position?.y ?? null,
+      zIndex: typeof zIndex === 'number' ? zIndex : note.position?.zIndex || 1,
+      rotation: typeof rotation === 'number' ? rotation : note.position?.rotation || 0,
+    };
+
+    await note.save();
+    res.json({ message: 'Position updated', position: note.position, note });
+  } catch (error) {
+    res.status(500).json({ message: 'Error updating position', error: error.message });
+  }
+};
+
+// @desc    Update batch note positions (e.g., auto arrange or reset)
+// @route   PATCH /api/sticky-notes/batch-positions
+// @access  Private (Owner only)
+exports.updateBatchPositions = async (req, res) => {
+  try {
+    const { positions } = req.body; // array of { id, x, y, zIndex, rotation }
+    if (!Array.isArray(positions) || positions.length === 0) {
+      return res.status(400).json({ message: 'Positions array required' });
+    }
+
+    const bulkOps = positions.map((p) => ({
+      updateOne: {
+        filter: { _id: p.id, user: req.user._id },
+        update: {
+          $set: {
+            'position.x': typeof p.x === 'number' ? Math.round(p.x) : null,
+            'position.y': typeof p.y === 'number' ? Math.round(p.y) : null,
+            'position.zIndex': typeof p.zIndex === 'number' ? p.zIndex : 1,
+            'position.rotation': typeof p.rotation === 'number' ? p.rotation : 0,
+          },
+        },
+      },
+    }));
+
+    await StickyNote.bulkWrite(bulkOps);
+    res.json({ message: 'Positions updated successfully' });
+  } catch (error) {
+    res.status(500).json({ message: 'Error updating batch positions', error: error.message });
   }
 };
 

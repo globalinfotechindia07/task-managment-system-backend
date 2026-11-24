@@ -11,6 +11,12 @@ const {
   adminDeleteDocument,
   downloadUserDocumentsZip,
   downloadSingleDocument,
+  getDocumentFields,
+  createDocumentField,
+  updateDocumentField,
+  deleteDocumentField,
+  toggleDocumentFieldActive,
+  seedDefaultDocumentFields,
 } = require('../controllers/documentController');
 
 // Role & Permission guard for viewing employee documents
@@ -90,6 +96,16 @@ const authorizeDocumentDelete = (req, res, next) => {
     message: 'Access Denied: Only Admins can permanently delete verified employee records.',
   });
 };
+
+/* ==========================================
+   Document Field Configurations (Dynamic Fields)
+   ========================================== */
+router.get('/fields', protect, getDocumentFields);
+router.post('/fields', protect, authorizeDocumentReview, createDocumentField);
+router.put('/fields/:id', protect, authorizeDocumentReview, updateDocumentField);
+router.delete('/fields/:id', protect, authorizeDocumentReview, deleteDocumentField);
+router.patch('/fields/:id/toggle', protect, authorizeDocumentReview, toggleDocumentFieldActive);
+router.post('/fields/seed-defaults', protect, authorizeDocumentReview, seedDefaultDocumentFields);
 
 /* ==========================================
    Employee Self-Service Document Routes

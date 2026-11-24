@@ -84,6 +84,12 @@ const stickyNoteSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
+    position: {
+      x: { type: Number, default: null },
+      y: { type: Number, default: null },
+      zIndex: { type: Number, default: 1 },
+      rotation: { type: Number, default: 0 },
+    },
   },
   {
     timestamps: true,

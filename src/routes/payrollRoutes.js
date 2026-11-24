@@ -8,6 +8,10 @@ const {
   getMySlips,
   getAllSlips,
   getEmployeesSalaryList,
+  getSalaryProcessList,
+  updateSalaryProcessStatus,
+  bulkUpdateSalaryProcessStatus,
+  sendSalarySlipEmail,
 } = require('../controllers/payrollController');
 const {
   getSalaryStructures,
@@ -41,5 +45,11 @@ router.get('/config/:userId', authorizePermission('payroll', 'view'), getConfig)
 router.post('/config', authorizePermission('payroll', 'edit'), updateConfig);
 router.post('/generate', authorizePermission('payroll', 'create'), generateSalary);
 router.get('/all', authorizePermission('payroll', 'view'), getAllSlips);
+
+// Salary Processing & Disbursement (Admin & Accountant)
+router.get('/process-status', authorizePermission('payroll', 'view'), getSalaryProcessList);
+router.patch('/process-status/:userId', authorizePermission('payroll', 'edit'), updateSalaryProcessStatus);
+router.post('/bulk-process-status', authorizePermission('payroll', 'edit'), bulkUpdateSalaryProcessStatus);
+router.post('/send-slip-email/:slipId', authorizePermission('payroll', 'edit'), sendSalarySlipEmail);
 
 module.exports = router;

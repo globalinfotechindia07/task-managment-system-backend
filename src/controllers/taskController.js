@@ -49,6 +49,7 @@ const getTasks = async (req, res) => {
       .populate('sprint', 'name sprintNumber status startDate endDate')
       .populate('assignedTo', 'name email role department')
       .populate('assignedBy', 'name email role')
+      .populate('activeTimeSession', 'status startTime totalPauseSeconds productiveDurationSeconds targetDurationMinutes mode currentPauseReason')
       .sort({ createdAt: -1 });
 
     res.json(tasks);
@@ -64,7 +65,8 @@ const createTask = async (req, res) => {
   try {
     const { 
       title, description, project, assignedTo, startDate, dueDate, 
-      estimatedTimeDuration, priority, status, sprint, sprintDay, scheduledDate 
+      estimatedTimeDuration, priority, status, sprint, sprintDay, scheduledDate,
+      targetDurationMinutes, timeTrackingMode, isTimerRequired
     } = req.body;
 
     const attachments = req.files ? req.files.map(file => `/uploads/${file.filename}`) : [];
@@ -74,6 +76,24 @@ const createTask = async (req, res) => {
 
     const adjustedStartDate = startDate ? new Date(startDate) : new Date();
     const calculatedDueDate = dueDate ? new Date(dueDate) : null;
+
+    let finalTargetMinutes = 0;
+    if (targetDurationMinutes !== undefined && targetDurationMinutes !== null && targetDurationMinutes !== '' && Number(targetDurationMinutes) > 0) {
+      finalTargetMinutes = Number(targetDurationMinutes);
+    } else if (estimatedTimeDuration && Number(estimatedTimeDuration) > 0) {
+      finalTargetMinutes = Math.round(Number(estimatedTimeDuration) * 60);
+    } else if (adjustedStartDate && calculatedDueDate && calculatedDueDate > adjustedStartDate) {
+      // Auto-derive target duration from Start Date & Time to End Date & Time
+      const diffMinutes = Math.round((calculatedDueDate.getTime() - adjustedStartDate.getTime()) / (1000 * 60));
+      if (diffMinutes > 0) {
+        finalTargetMinutes = diffMinutes;
+      }
+    }
+
+    let finalEstimatedHours = estimatedTimeDuration;
+    if (!finalEstimatedHours && finalTargetMinutes > 0) {
+      finalEstimatedHours = Number((finalTargetMinutes / 60).toFixed(2));
+    }
 
     const task = new Task({
       title,
@@ -87,7 +107,10 @@ const createTask = async (req, res) => {
       assignedBy: req.user._id,
       startDate: adjustedStartDate,
       dueDate: calculatedDueDate,
-      estimatedTimeDuration,
+      estimatedTimeDuration: finalEstimatedHours,
+      targetDurationMinutes: finalTargetMinutes,
+      timeTrackingMode: timeTrackingMode === 'timeline' ? 'timeline' : 'stopwatch',
+      isTimerRequired: isTimerRequired !== undefined ? (isTimerRequired === 'true' || isTimerRequired === true) : true,
       priority,
       status: initialStatus,
       attachments,
@@ -155,7 +178,7 @@ const updateTask = async (req, res) => {
       const updates = req.body;
       const historyLog = [];
 
-      ['title', 'description', 'startDate', 'dueDate', 'estimatedTimeDuration', 'priority', 'status', 'assignedTo'].forEach(field => {
+      ['title', 'description', 'startDate', 'dueDate', 'estimatedTimeDuration', 'priority', 'status', 'assignedTo', 'targetDurationMinutes', 'timeTrackingMode', 'isTimerRequired'].forEach(field => {
         if (updates[field] !== undefined && updates[field] !== task[field]?.toString()) {
           historyLog.push({
             action: `${field} updated to ${updates[field]}`,
@@ -174,6 +197,17 @@ const updateTask = async (req, res) => {
         task.startDate = adjustToWorkingHours(task.startDate);
         if (task.estimatedTimeDuration) {
           task.dueDate = calculateTaskDueDate(task.startDate, task.estimatedTimeDuration);
+        }
+      }
+
+      // Auto-recalculate target duration if start & due dates are provided and target not explicitly passed
+      if ((updates.startDate || updates.dueDate) && updates.targetDurationMinutes === undefined) {
+        const sTime = task.startDate ? new Date(task.startDate).getTime() : 0;
+        const eTime = task.dueDate ? new Date(task.dueDate).getTime() : 0;
+        if (eTime > sTime) {
+          const diffMins = Math.round((eTime - sTime) / (1000 * 60));
+          task.targetDurationMinutes = diffMins;
+          task.estimatedTimeDuration = Number((diffMins / 60).toFixed(2));
         }
       }
 
@@ -310,6 +344,7 @@ const getTaskById = async (req, res) => {
       .populate('project', 'name status')
       .populate('assignedTo', 'name email role')
       .populate('assignedBy', 'name email role')
+      .populate('activeTimeSession', 'status startTime totalPauseSeconds productiveDurationSeconds targetDurationMinutes mode currentPauseReason')
       .populate('comments.user', 'name role')
       .populate('reports.user', 'name role')
       .populate('history.user', 'name role');

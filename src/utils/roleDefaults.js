@@ -47,7 +47,7 @@ const DEFAULT_ROLES = {
     isSystemRole: false,
     permissions: {
       users: { view: true, create: true, edit: true, delete: false },
-      projects: { view: false, create: false, edit: false, delete: false },
+      projects: { view: true, create: false, edit: false, delete: false },
       tasks: { view: true, create: false, edit: false, delete: false },
       attendance: { view: true, create: false, edit: true, delete: false },
       payroll: { view: true, create: true, edit: true, delete: false },
@@ -65,7 +65,7 @@ const DEFAULT_ROLES = {
     isSystemRole: false,
     permissions: {
       users: { view: true, create: false, edit: false, delete: false },
-      projects: { view: true, create: false, edit: false, delete: false },
+      projects: { view: true, create: true, edit: true, delete: false },
       tasks: { view: true, create: true, edit: true, delete: false },
       attendance: { view: true, create: false, edit: false, delete: false },
       payroll: { view: false, create: false, edit: false, delete: false },
@@ -83,7 +83,7 @@ const DEFAULT_ROLES = {
     isSystemRole: false,
     permissions: {
       users: { view: false, create: false, edit: false, delete: false },
-      projects: { view: false, create: false, edit: false, delete: false },
+      projects: { view: true, create: false, edit: false, delete: false },
       tasks: { view: true, create: true, edit: true, delete: false },
       attendance: { view: true, create: true, edit: false, delete: false },
       payroll: { view: false, create: false, edit: false, delete: false },
@@ -101,7 +101,7 @@ const DEFAULT_ROLES = {
     isSystemRole: false,
     permissions: {
       users: { view: true, create: false, edit: false, delete: false },
-      projects: { view: false, create: false, edit: false, delete: false },
+      projects: { view: true, create: false, edit: false, delete: false },
       tasks: { view: true, create: false, edit: false, delete: false },
       attendance: { view: true, create: false, edit: false, delete: false },
       payroll: { view: true, create: true, edit: true, delete: false },
@@ -186,13 +186,15 @@ const getUserPermissions = async (user) => {
 
   const companyId = user.company?._id || user.company;
 
+  let permissions = null;
+
   // 1. If user has explicit roleRef populated or referenced
   if (user.roleRef && user.roleRef.permissions) {
-    return user.roleRef.permissions;
+    permissions = user.roleRef.permissions;
   }
 
   // 2. Look up by user.role or normalized alias in company's Role records
-  if (companyId) {
+  if (!permissions && companyId) {
     const templateKey = getRoleTemplateKey(user.role);
     const roleDoc = await Role.findOne({ 
       company: companyId, 
@@ -203,21 +205,38 @@ const getUserPermissions = async (user) => {
       ]
     });
     if (roleDoc && roleDoc.permissions) {
-      return roleDoc.permissions;
+      permissions = roleDoc.permissions;
     }
   }
 
   // 3. Fallback to default definition if available
-  const templateKey = getRoleTemplateKey(user.role);
-  if (DEFAULT_ROLES[templateKey]) {
-    return DEFAULT_ROLES[templateKey].permissions;
+  if (!permissions) {
+    const templateKey = getRoleTemplateKey(user.role);
+    if (DEFAULT_ROLES[templateKey]) {
+      permissions = DEFAULT_ROLES[templateKey].permissions;
+    }
   }
 
   // 4. Default safe fallback
-  return ALL_MODULES.reduce((acc, mod) => {
-    acc[mod] = { ...NO_ACCESS };
-    return acc;
-  }, {});
+  if (!permissions) {
+    permissions = ALL_MODULES.reduce((acc, mod) => {
+      acc[mod] = { ...NO_ACCESS };
+      return acc;
+    }, {});
+  }
+
+  // Deep clone to avoid mutating schema/static references
+  const resolved = JSON.parse(JSON.stringify(permissions));
+
+  // Ensure projects view is enabled for all company staff so project dropdowns,
+  // tasks, time-tracking, and company projects load smoothly
+  if (!resolved.projects) {
+    resolved.projects = { view: true, create: false, edit: false, delete: false };
+  } else {
+    resolved.projects.view = true;
+  }
+
+  return resolved;
 };
 
 module.exports = {

@@ -69,6 +69,36 @@ const salarySlipSchema = mongoose.Schema({
     presentDays: Number,
     lateDays: Number,
     absentDays: Number
+  },
+  status: {
+    type: String,
+    enum: ['Pending', 'In Process', 'Paid', 'On Hold'],
+    default: 'Pending',
+    index: true
+  },
+  paymentMode: {
+    type: String,
+    default: ''
+  },
+  paymentDate: {
+    type: Date
+  },
+  transactionRef: {
+    type: String,
+    trim: true,
+    default: ''
+  },
+  remarks: {
+    type: String,
+    trim: true,
+    default: ''
+  },
+  processedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
+  },
+  processedAt: {
+    type: Date
   }
 }, { timestamps: true });
 
