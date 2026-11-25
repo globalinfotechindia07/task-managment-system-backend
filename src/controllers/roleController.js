@@ -1,6 +1,6 @@
 const Role = require('../models/Role');
 const User = require('../models/User');
-const { ensureCompanyRoles, ALL_MODULES, getUserPermissions, DEFAULT_ROLES, getRoleTemplateKey } = require('../utils/roleDefaults');
+const { ensureCompanyRoles, ALL_MODULES, ALL_SUBMENUS, getUserPermissions, DEFAULT_ROLES, getRoleTemplateKey } = require('../utils/roleDefaults');
 
 // @desc    Get all roles and permissions for company
 // @route   GET /api/roles
@@ -257,6 +257,20 @@ const resetRoleToDefaults = async (req, res) => {
   }
 };
 
+// @desc    Get complete catalog of all sub-menus for permission configuration
+// @route   GET /api/roles/submenus-catalog
+// @access  Private
+const getSubmenusCatalog = async (req, res) => {
+  try {
+    res.json({
+      success: true,
+      submenus: ALL_SUBMENUS,
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 module.exports = {
   getRoles,
   createRole,
@@ -264,5 +278,6 @@ module.exports = {
   deleteRole,
   getMyPermissions,
   getRoleTemplates,
-  resetRoleToDefaults
+  resetRoleToDefaults,
+  getSubmenusCatalog,
 };

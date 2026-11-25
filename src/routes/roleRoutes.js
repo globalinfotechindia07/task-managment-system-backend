@@ -7,7 +7,8 @@ const {
   deleteRole,
   getMyPermissions,
   getRoleTemplates,
-  resetRoleToDefaults
+  resetRoleToDefaults,
+  getSubmenusCatalog,
 } = require('../controllers/roleController');
 const { protect, authorizeRoles } = require('../middleware/authMiddleware');
 
@@ -18,6 +19,9 @@ router.get('/my-permissions', getMyPermissions);
 
 // Standard role template definitions
 router.get('/templates', getRoleTemplates);
+
+// All submenus catalog
+router.get('/submenus-catalog', getSubmenusCatalog);
 
 // Company roles management
 router.route('/')

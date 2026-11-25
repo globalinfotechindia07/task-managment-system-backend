@@ -1,6 +1,12 @@
 const express = require('express');
 const router = express.Router();
-const { authUser, getUserProfile, forcePasswordChange, updateUserProfile } = require('../controllers/authController');
+const {
+  authUser,
+  getUserProfile,
+  forcePasswordChange,
+  updateUserProfile,
+  getDemoCredentials,
+} = require('../controllers/authController');
 const { protect } = require('../middleware/authMiddleware');
 const multer = require('multer');
 
@@ -16,6 +22,7 @@ const storage = multer.diskStorage({
 const upload = multer({ storage });
 
 router.post('/login', authUser);
+router.get('/demo-credentials', getDemoCredentials);
 router.route('/profile')
   .get(protect, getUserProfile)
   .put(protect, upload.single('profilePicture'), updateUserProfile);

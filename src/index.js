@@ -21,6 +21,7 @@ const initMonthlyReportJob = require('./jobs/monthlyReportJob');
 const initMonthlyPayrollJob = require('./jobs/monthlyPayrollJob');
 const initAuditLogCleanupJob = require('./jobs/auditLogCleanupJob');
 const initStickyNoteReminderJob = require('./jobs/stickyNoteReminderJob');
+const initDemoDataCleanupJob = require('./jobs/demoDataCleanupJob');
 
 // Routes
 app.use('/api/auth', require('./routes/authRoutes'));
@@ -105,6 +106,7 @@ initMonthlyReportJob();
 initMonthlyPayrollJob();
 initAuditLogCleanupJob();
 initStickyNoteReminderJob();
+initDemoDataCleanupJob();
 
 const PORT = process.env.PORT || 5000;
 

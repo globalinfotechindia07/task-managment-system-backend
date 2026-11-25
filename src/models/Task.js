@@ -71,6 +71,10 @@ const taskSchema = mongoose.Schema({
     type: Boolean,
     default: true,
   },
+  isDemoBaseline: {
+    type: Boolean,
+    default: false,
+  },
   totalLoggedSeconds: {
     type: Number,
     default: 0,

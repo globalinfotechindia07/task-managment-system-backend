@@ -2,6 +2,8 @@ const User = require('../models/User');
 const Company = require('../models/Company');
 const Role = require('../models/Role');
 const { sendWelcomeUserEmail } = require('../utils/emailService');
+const { getUserPermissions, ALL_SUBMENUS } = require('../utils/roleDefaults');
+const { logAudit } = require('../utils/auditLogger');
 
 // @desc    Get all users (Scoped to tenant office, or all if Super Admin)
 // @route   GET /api/users
@@ -305,4 +307,114 @@ const deleteUser = async (req, res) => {
   }
 };
 
-module.exports = { getUsers, createUser, updateUser, deleteUser };
+// @desc    Get user's permissions and sub-menu access overrides
+// @route   GET /api/users/:id/permissions
+// @access  Private (Admin, HR with users.view)
+const getUserPermissionsHandler = async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id)
+      .select('-password')
+      .populate('roleRef', 'name displayName permissions');
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    const currentCompanyId = (req.companyId || req.user.company?._id || req.user.company || '').toString();
+    const userCompanyId = (user.company?._id || user.company || '').toString();
+
+    if (req.user.role !== 'Super Admin' && userCompanyId !== currentCompanyId) {
+      return res.status(403).json({ message: 'Not authorized to view permissions for another office' });
+    }
+
+    const effectivePermissions = await getUserPermissions(user);
+
+    res.json({
+      success: true,
+      user: {
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        designation: user.designation,
+        department: user.department,
+        customPermissions: user.customPermissions || null,
+      },
+      submenusCatalog: ALL_SUBMENUS,
+      effectivePermissions,
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc    Update user's custom sub-menu permissions
+// @route   PUT /api/users/:id/permissions
+// @access  Private (Admin, CTO, Super Admin)
+const updateUserPermissionsHandler = async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id);
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    const currentCompanyId = (req.companyId || req.user.company?._id || req.user.company || '').toString();
+    const userCompanyId = (user.company?._id || user.company || '').toString();
+
+    if (req.user.role !== 'Super Admin') {
+      if (userCompanyId !== currentCompanyId) {
+        return res.status(403).json({ message: 'Not authorized to edit permissions of another office' });
+      }
+
+      if (['Admin', 'Super Admin'].includes(user.role)) {
+        return res.status(403).json({ message: 'Cannot customize permissions for Administrator' });
+      }
+    }
+
+    const { submenus, customModules } = req.body;
+
+    user.customPermissions = {
+      ...(user.customPermissions || {}),
+      submenus: submenus || {},
+      customModules: customModules || {},
+    };
+
+    user.markModified('customPermissions');
+    await user.save();
+
+    const effectivePermissions = await getUserPermissions(user);
+
+    logAudit({
+      user: req.user,
+      company: user.company,
+      action: 'UPDATE_USER_PERMISSIONS',
+      category: 'AUTH',
+      status: 'SUCCESS',
+      details: {
+        targetUserId: user._id,
+        targetEmail: user.email,
+        submenusCount: Object.keys(submenus || {}).length,
+      },
+      req,
+    });
+
+    res.json({
+      success: true,
+      message: `Permissions updated successfully for ${user.name}`,
+      customPermissions: user.customPermissions,
+      effectivePermissions,
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+module.exports = {
+  getUsers,
+  createUser,
+  updateUser,
+  deleteUser,
+  getUserPermissionsHandler,
+  updateUserPermissionsHandler,
+};

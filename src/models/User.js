@@ -65,6 +65,14 @@ const userSchema = mongoose.Schema({
     },
     profilePicture: {
       type: String
+    },
+    isDemo: {
+      type: Boolean,
+      default: false
+    },
+    customPermissions: {
+      type: mongoose.Schema.Types.Mixed,
+      default: null
     }
 }, { timestamps: true });
 

@@ -2,6 +2,7 @@ const User = require('../models/User');
 const jwt = require('jsonwebtoken');
 const { getUserPermissions } = require('../utils/roleDefaults');
 const { logAudit } = require('../utils/auditLogger');
+const { DEMO_ACCOUNTS_META, DEMO_COMPANY_CODE } = require('../services/demoService');
 
 // Generate JWT (Persistent enterprise session - 365 days)
 const generateToken = (id) => {
@@ -116,6 +117,9 @@ const forcePasswordChange = async (req, res) => {
   const user = await User.findById(req.user._id);
 
   if (user) {
+    if (user.isDemo) {
+      return res.status(403).json({ message: 'Password changes are disabled on public demo sandbox accounts.' });
+    }
     if (req.body.password) {
       user.password = req.body.password;
       user.requiresPasswordChange = false;
@@ -150,6 +154,9 @@ const updateUserProfile = async (req, res) => {
     user.phone = req.body.phone || user.phone;
     
     if (req.body.password) {
+      if (user.isDemo) {
+        return res.status(403).json({ message: 'Password changes are disabled on public demo sandbox accounts.' });
+      }
       if (!req.body.oldPassword) {
          return res.status(400).json({ message: 'Please provide current password to change it' });
       }
@@ -182,4 +189,20 @@ const updateUserProfile = async (req, res) => {
   }
 };
 
-module.exports = { authUser, getUserProfile, forcePasswordChange, updateUserProfile };
+// @desc    Get public demo sandbox credentials
+// @route   GET /api/auth/demo-credentials
+// @access  Public
+const getDemoCredentials = async (req, res) => {
+  try {
+    res.json({
+      success: true,
+      companyCode: DEMO_COMPANY_CODE,
+      message: 'Demo credentials for public sandbox. All visitor-created data automatically purges after 24 hours.',
+      accounts: DEMO_ACCOUNTS_META,
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching demo credentials', error: error.message });
+  }
+};
+
+module.exports = { authUser, getUserProfile, forcePasswordChange, updateUserProfile, getDemoCredentials };
