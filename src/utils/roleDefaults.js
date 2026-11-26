@@ -15,6 +15,7 @@ const ALL_MODULES = [
   'sprints',
   'integrations',
   'documents',
+  'agreements',
 ];
 
 const FULL_ACCESS = {
@@ -56,7 +57,8 @@ const DEFAULT_ROLES = {
       chat: { view: true, create: true, edit: false, delete: false },
       reports: { view: true, create: false, edit: false, delete: false },
       settings: { view: false, create: false, edit: false, delete: false },
-      documents: { view: true, create: true, edit: true, delete: false }
+      documents: { view: true, create: true, edit: true, delete: false },
+      agreements: { view: true, create: true, edit: true, delete: false }
     }
   },
   'Team Head': {
@@ -74,7 +76,8 @@ const DEFAULT_ROLES = {
       chat: { view: true, create: true, edit: false, delete: false },
       reports: { view: true, create: true, edit: true, delete: false },
       settings: { view: false, create: false, edit: false, delete: false },
-      documents: { view: true, create: false, edit: false, delete: false }
+      documents: { view: true, create: false, edit: false, delete: false },
+      agreements: { view: true, create: true, edit: false, delete: false }
     }
   },
   'User': {
@@ -92,7 +95,8 @@ const DEFAULT_ROLES = {
       chat: { view: true, create: true, edit: false, delete: false },
       reports: { view: true, create: true, edit: false, delete: false },
       settings: { view: false, create: false, edit: false, delete: false },
-      documents: { view: true, create: true, edit: false, delete: false }
+      documents: { view: true, create: true, edit: false, delete: false },
+      agreements: { view: true, create: false, edit: false, delete: false }
     }
   },
   'Accountant': {
@@ -110,7 +114,8 @@ const DEFAULT_ROLES = {
       chat: { view: true, create: true, edit: false, delete: false },
       reports: { view: true, create: false, edit: false, delete: false },
       settings: { view: false, create: false, edit: false, delete: false },
-      documents: { view: true, create: false, edit: false, delete: false }
+      documents: { view: true, create: false, edit: false, delete: false },
+      agreements: { view: true, create: true, edit: false, delete: false }
     }
   }
 };
@@ -184,7 +189,7 @@ const ALL_SUBMENUS = [
     id: 'work_client_portal',
     name: 'Client Portal & Billings',
     path: '/admin/client-portal',
-    category: 'Work & Projects',
+    category: 'Finance & Billing',
     description: 'Manage client deliverables, milestone tracking and billing status',
     defaultRoles: ['Admin', 'Accountant']
   },
@@ -216,7 +221,7 @@ const ALL_SUBMENUS = [
     id: 'work_reports_center',
     name: 'Reports & Export Hub',
     path: '/admin/reports-center',
-    category: 'Work & Projects',
+    category: 'Reports & Analytics',
     description: 'Download attendance, salary, project and user audit reports',
     defaultRoles: ['Admin', 'HR Manager', 'Team Head', 'Accountant']
   },
@@ -224,7 +229,7 @@ const ALL_SUBMENUS = [
     id: 'work_time_tracker',
     name: 'Time Tracker & Logs',
     path: '/time-tracker',
-    category: 'Work & Projects',
+    category: 'Time & Productivity',
     description: 'Live task timer sessions and working hours stopwatch',
     defaultRoles: ['Admin', 'HR Manager', 'Team Head', 'User', 'Accountant']
   },
@@ -232,7 +237,7 @@ const ALL_SUBMENUS = [
     id: 'work_performance',
     name: 'Performance Analysis',
     path: '/admin/performance',
-    category: 'Work & Projects',
+    category: 'Reports & Analytics',
     description: 'Team efficiency ratings and productivity KPI metrics',
     defaultRoles: ['Admin', 'HR Manager', 'Team Head']
   },
@@ -271,6 +276,40 @@ const ALL_SUBMENUS = [
     defaultRoles: ['Admin']
   },
 
+  // 3. E-Agreements Hub
+  {
+    id: 'e_agreements_dashboard',
+    name: 'Agreements Overview',
+    path: '/admin/e-agreements',
+    category: 'E-Agreements',
+    description: 'Agreement metrics, recent documents, and rapid generation hub',
+    defaultRoles: ['Admin', 'HR Manager', 'Team Head', 'Accountant']
+  },
+  {
+    id: 'e_agreements_templates',
+    name: 'Templates & Designer',
+    path: '/admin/e-agreements/templates',
+    category: 'E-Agreements',
+    description: 'Design multi-page agreement templates with dynamic variables',
+    defaultRoles: ['Admin', 'HR Manager']
+  },
+  {
+    id: 'e_agreements_generated',
+    name: 'All Generated Agreements',
+    path: '/admin/e-agreements/list',
+    category: 'E-Agreements',
+    description: 'Track signed documents, verification status, and PDF downloads',
+    defaultRoles: ['Admin', 'HR Manager', 'Team Head', 'Accountant']
+  },
+  {
+    id: 'e_agreements_settings',
+    name: 'Gateway API Settings',
+    path: '/admin/e-agreements/settings',
+    category: 'E-Agreements',
+    description: 'Configure E-Agreement sandbox/production credentials & API keys',
+    defaultRoles: ['Admin']
+  },
+
   // 3. Human Resources
   {
     id: 'hr_users',
@@ -300,7 +339,7 @@ const ALL_SUBMENUS = [
     id: 'hr_attendance',
     name: 'Daily Attendance & Edit',
     path: '/admin/attendance',
-    category: 'Human Resources',
+    category: 'Attendance & Leaves',
     description: 'Daily office punch logs, audit edits, and manual regularizations',
     defaultRoles: ['Admin', 'HR Manager']
   },
@@ -308,7 +347,7 @@ const ALL_SUBMENUS = [
     id: 'hr_attendance_settings',
     name: 'Attendance Policy',
     path: '/admin/attendance-settings',
-    category: 'Human Resources',
+    category: 'Attendance & Leaves',
     description: 'Configure geofence coordinates, grace periods, and shift timings',
     defaultRoles: ['Admin', 'HR Manager']
   },
@@ -316,7 +355,7 @@ const ALL_SUBMENUS = [
     id: 'hr_leaves',
     name: 'Leaves & Holidays',
     path: '/admin/leaves',
-    category: 'Human Resources',
+    category: 'Attendance & Leaves',
     description: 'Review and approve staff leave applications and holiday lists',
     defaultRoles: ['Admin', 'HR Manager', 'Team Head']
   },
@@ -334,7 +373,7 @@ const ALL_SUBMENUS = [
     id: 'payroll_salary_process',
     name: 'Salary Process & Status',
     path: '/salary-process',
-    category: 'Payroll & Finance',
+    category: 'Payroll Management',
     description: 'Monthly payroll calculation, overtime, and slip distribution',
     defaultRoles: ['Admin', 'HR Manager', 'Accountant']
   },
@@ -342,7 +381,7 @@ const ALL_SUBMENUS = [
     id: 'payroll_billing',
     name: 'Client Invoicing & Billing',
     path: '/accountant/billing',
-    category: 'Payroll & Finance',
+    category: 'Finance & Billing',
     description: 'Issue invoices, record payment receipts, and customer ledgers',
     defaultRoles: ['Admin', 'Accountant']
   },
@@ -350,7 +389,7 @@ const ALL_SUBMENUS = [
     id: 'payroll_salary_management',
     name: 'Salary Management',
     path: '/admin/salary-management',
-    category: 'Payroll & Finance',
+    category: 'Payroll Management',
     description: 'Configure employee salary structures and basic wage rules',
     defaultRoles: ['Admin', 'HR Manager', 'Accountant']
   },
@@ -358,7 +397,7 @@ const ALL_SUBMENUS = [
     id: 'payroll_settings',
     name: 'Payroll Settings',
     path: '/admin/payroll-settings',
-    category: 'Payroll & Finance',
+    category: 'Payroll Management',
     description: 'Statutory EPF, ESI, and Professional Tax formulas',
     defaultRoles: ['Admin', 'HR Manager', 'Accountant']
   },
