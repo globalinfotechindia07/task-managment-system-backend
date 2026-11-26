@@ -114,7 +114,7 @@ const agreementConfigSchema = new mongoose.Schema(
     // Global Master Gateway Toggle
     isEnabled: {
       type: Boolean,
-      default: false,
+      default: true,
     },
     autoSyncTemplates: {
       type: Boolean,
@@ -124,7 +124,7 @@ const agreementConfigSchema = new mongoose.Schema(
     sandbox: {
       type: envSettingsSchema,
       default: () => ({
-        apiKey: '',
+        apiKey: 'ak_test_eagreement_38cf5de743c4b8dc379a257e9b9d',
         baseUrl: 'https://backend.chitraguptccrms.com/api/v1',
         isEnabled: true,
         endpoints: {

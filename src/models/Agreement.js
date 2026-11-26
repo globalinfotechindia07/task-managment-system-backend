@@ -125,6 +125,16 @@ const agreementSchema = new mongoose.Schema(
       type: String,
       default: '',
     },
+    external_document_url: {
+      type: String,
+      default: '',
+    },
+    pages: [
+      {
+        pageNumber: { type: Number, default: 1 },
+        content: { type: String, default: '' },
+      },
+    ],
     content_preview: {
       type: String,
       default: '',

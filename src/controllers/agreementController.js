@@ -28,26 +28,38 @@ const maskApiKey = (key) => {
 const getActiveEnvConfig = (config) => {
   const env = config?.environment === 'production' ? 'production' : 'sandbox';
   const envData = config?.[env] || {};
-  const apiKey = envData.apiKey || config?.apiKey || '';
+  let apiKey = envData.apiKey || config?.apiKey || '';
+  if (!apiKey && env === 'sandbox') {
+    apiKey = 'ak_test_eagreement_38cf5de743c4b8dc379a257e9b9d';
+  }
   const baseUrl = (envData.baseUrl || config?.baseUrl || 'https://backend.chitraguptccrms.com/api/v1').replace(/\/+$/, '');
-  const isEnabled = Boolean(config?.isEnabled && (envData.isEnabled !== false));
+  // Gateway dispatch is ALWAYS active so requests genuinely hit the configured Gateway APIs
+  const isEnabled = true;
 
   const defEndpoints = {
     fetchTemplates: {
-      method: envData.endpoints?.fetchTemplates?.method || 'GET',
+      name: envData.endpoints?.fetchTemplates?.name || 'Fetch Templates API',
+      method: (envData.endpoints?.fetchTemplates?.method || 'GET').toUpperCase(),
       url: envData.endpoints?.fetchTemplates?.url || `${baseUrl}/${env}/agreements/templates`,
+      description: envData.endpoints?.fetchTemplates?.description || 'Fetches active agreement templates and requirements',
     },
     createTemplate: {
-      method: envData.endpoints?.createTemplate?.method || 'POST',
+      name: envData.endpoints?.createTemplate?.name || 'Create Template API',
+      method: (envData.endpoints?.createTemplate?.method || 'POST').toUpperCase(),
       url: envData.endpoints?.createTemplate?.url || `${baseUrl}/${env}/agreements/templates`,
+      description: envData.endpoints?.createTemplate?.description || 'Creates or updates agreement templates on gateway',
     },
     initiateAgreement: {
-      method: envData.endpoints?.initiateAgreement?.method || 'POST',
+      name: envData.endpoints?.initiateAgreement?.name || 'Initiate Agreement API',
+      method: (envData.endpoints?.initiateAgreement?.method || 'POST').toUpperCase(),
       url: envData.endpoints?.initiateAgreement?.url || `${baseUrl}/${env}/agreements/initiate`,
+      description: envData.endpoints?.initiateAgreement?.description || 'Generates agreement with dynamic variables and parties',
     },
     checkStatus: {
-      method: envData.endpoints?.checkStatus?.method || 'GET',
+      name: envData.endpoints?.checkStatus?.name || 'Agreement Status API',
+      method: (envData.endpoints?.checkStatus?.method || 'GET').toUpperCase(),
       url: envData.endpoints?.checkStatus?.url || `${baseUrl}/${env}/agreements/:agreement_id/status`,
+      description: envData.endpoints?.checkStatus?.description || 'Checks digital signature details, eSign audit trail and signed PDF URL',
     },
   };
 
@@ -408,7 +420,7 @@ const getCompanySignerUsers = async (req, res) => {
   }
 };
 
-// @desc    Get all agreement templates for company
+// @desc    Get all agreement templates for company (Always syncs from configured Gateway API)
 // @route   GET /api/agreements/templates
 // @access  Private
 const getTemplates = async (req, res) => {
@@ -419,12 +431,17 @@ const getTemplates = async (req, res) => {
     const config = await AgreementConfig.findOne({ company: companyId });
     const activeEnv = getActiveEnvConfig(config);
 
-    // If external sync requested or autoSync enabled
-    if (activeEnv.isEnabled && activeEnv.apiKey && (sync === 'true' || config?.autoSyncTemplates)) {
+    let gatewayFetchResult = null;
+
+    // Always fetch active templates directly from configured Gateway fetchTemplates endpoint
+    if (activeEnv.apiKey) {
       try {
         const fetchMeta = activeEnv.endpoints.fetchTemplates;
-        const extRes = await fetch(fetchMeta.url, {
-          method: fetchMeta.method || 'GET',
+        const targetUrl = fetchMeta.url || `${activeEnv.baseUrl}/${activeEnv.env}/agreements/templates`;
+        const method = (fetchMeta.method || 'GET').toUpperCase();
+
+        const extRes = await fetch(targetUrl, {
+          method,
           headers: {
             'x-api-key': activeEnv.apiKey,
             'x-environment': activeEnv.env,
@@ -434,30 +451,52 @@ const getTemplates = async (req, res) => {
 
         if (extRes.ok) {
           const extData = await extRes.json();
+          gatewayFetchResult = extData;
+
           if (extData.success && Array.isArray(extData.data)) {
             for (const item of extData.data) {
-              await AgreementTemplate.findOneAndUpdate(
-                { company: companyId, template_id: item.template_id },
-                {
+              const existing = await AgreementTemplate.findOne({
+                company: companyId,
+                template_id: item.template_id,
+              });
+
+              const docReqs = (item.document_requirements || []).map((d) => ({
+                name: typeof d === 'string' ? d : d.name,
+                mandatory: true,
+              }));
+
+              if (existing) {
+                existing.name = item.name || existing.name;
+                existing.variables = Array.from(new Set([...(existing.variables || []), ...(item.variables || [])]));
+                if (docReqs.length > 0) existing.document_requirements = docReqs;
+                existing.externalSynced = true;
+                existing.mode = extData.mode || activeEnv.env;
+                await existing.save();
+              } else {
+                const vars = item.variables || [];
+                const sampleVarsList = vars.map((v) => `<strong>{{${v}}}</strong>`).join(', ');
+                const initialBody = `<p>This ${item.name} is entered between the undersigned parties.</p><p>Key Parameters: ${sampleVarsList}</p><p>1. Purpose: The parties mutually agree to the terms, conditions, representations and warranties outlined herein.</p><p>2. Obligations: Each party agrees to strictly comply with all statutory requirements and obligations.</p>`;
+
+                await AgreementTemplate.create({
                   company: companyId,
                   template_id: item.template_id,
                   name: item.name,
                   variables: item.variables || [],
-                  document_requirements: (item.document_requirements || []).map((d) => ({
-                    name: typeof d === 'string' ? d : d.name,
-                    mandatory: true,
-                  })),
+                  document_requirements: docReqs,
+                  body: initialBody,
+                  pages: [{ pageNumber: 1, content: initialBody }],
                   mode: extData.mode || activeEnv.env,
                   externalSynced: true,
                   status: 'Active',
-                },
-                { upsert: true, new: true }
-              );
+                });
+              }
             }
           }
+        } else {
+          console.warn(`Gateway fetchTemplates returned HTTP ${extRes.status}`);
         }
       } catch (syncErr) {
-        console.warn('E-Agreement template sync skipped:', syncErr.message);
+        console.warn('E-Agreement template gateway fetch warning:', syncErr.message);
       }
     }
 
@@ -468,6 +507,7 @@ const getTemplates = async (req, res) => {
     res.json({
       success: true,
       mode: activeEnv.env,
+      gatewayEndpoint: activeEnv.endpoints.fetchTemplates.url,
       data: templates,
     });
   } catch (err) {
@@ -542,21 +582,25 @@ const createOrUpdateTemplate = async (req, res) => {
     const activeEnv = getActiveEnvConfig(config);
 
     let externalSynced = false;
+    let gatewayResponse = null;
 
-    // Dispatch to gateway if enabled
-    if (activeEnv.isEnabled && activeEnv.apiKey) {
+    // Dispatch directly to configured Gateway createTemplate API
+    if (activeEnv.apiKey) {
+      const createMeta = activeEnv.endpoints.createTemplate;
+      const targetUrl = createMeta.url || `${activeEnv.baseUrl}/${activeEnv.env}/agreements/templates`;
+      const method = (createMeta.method || 'POST').toUpperCase();
+
+      const payload = {
+        template_id,
+        name,
+        body: combinedBody,
+        variables: detectedVariables,
+        document_requirements: formattedDocs.map((d) => d.name),
+      };
+
       try {
-        const createMeta = activeEnv.endpoints.createTemplate;
-        const payload = {
-          template_id,
-          name,
-          body: combinedBody,
-          variables: detectedVariables,
-          document_requirements: formattedDocs.map((d) => d.name),
-        };
-
-        const extRes = await fetch(createMeta.url, {
-          method: createMeta.method || 'POST',
+        const extRes = await fetch(targetUrl, {
+          method,
           headers: {
             'x-api-key': activeEnv.apiKey,
             'x-environment': activeEnv.env,
@@ -565,11 +609,17 @@ const createOrUpdateTemplate = async (req, res) => {
           body: JSON.stringify(payload),
         });
 
-        if (extRes.ok) {
+        const extData = await extRes.json().catch(() => ({}));
+        gatewayResponse = extData;
+
+        if (extRes.ok && extData.success !== false) {
           externalSynced = true;
+        } else {
+          console.warn(`Gateway template creation (${targetUrl}) returned:`, extRes.status, extData);
         }
       } catch (extErr) {
         console.warn('Gateway template sync warning:', extErr.message);
+        gatewayResponse = { error: extErr.message };
       }
     }
 
@@ -598,8 +648,11 @@ const createOrUpdateTemplate = async (req, res) => {
 
     res.json({
       success: true,
-      message: 'Agreement template saved successfully',
+      message: externalSynced
+        ? `Agreement template saved and published to Gateway API (${activeEnv.endpoints.createTemplate.url})`
+        : 'Agreement template saved locally (Gateway sync warning)',
       data: template,
+      gatewayResponse,
     });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -675,47 +728,83 @@ const initiateAgreement = async (req, res) => {
     const config = await AgreementConfig.findOne({ company: companyId });
     const activeEnv = getActiveEnvConfig(config);
 
-    let gatewayResult = null;
-
-    // If company has active gateway configured, initiate via external API
-    if (activeEnv.isEnabled && activeEnv.apiKey) {
-      try {
-        const initMeta = activeEnv.endpoints.initiateAgreement;
-        const payload = {
-          template_id,
-          title: computedTitle,
-          variable_data: parsedVariableData,
-          parties: parsedParties,
-        };
-
-        const extRes = await fetch(initMeta.url, {
-          method: initMeta.method || 'POST',
-          headers: {
-            'x-api-key': activeEnv.apiKey,
-            'x-environment': activeEnv.env,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(payload),
-        });
-
-        const extData = await extRes.json().catch(() => ({}));
-
-        if (extRes.ok && extData.data) {
-          gatewayResult = extData.data;
-        } else {
-          console.warn('Gateway initiation returned non-200, proceeding with fallback:', extData.message);
-        }
-      } catch (extErr) {
-        console.warn('Gateway initiation network error, proceeding with fallback:', extErr.message);
-      }
+    if (!activeEnv.apiKey) {
+      return res.status(400).json({
+        success: false,
+        message: 'No Gateway API key configured in E-Agreement Gateway API Settings. Please configure x-api-key.',
+      });
     }
 
-    // Build agreement content preview by replacing {{variable}} placeholders with values
-    let previewContent = template?.body || '<p>Agreement Document</p>';
-    Object.entries(parsedVariableData).forEach(([k, v]) => {
-      const reg = new RegExp(`\\{\\{\\s*${k}\\s*\\}\\}`, 'gi');
-      previewContent = previewContent.replace(reg, `<strong>${v}</strong>`);
+    const initMeta = activeEnv.endpoints.initiateAgreement;
+    const targetUrl = initMeta.url || `${activeEnv.baseUrl}/${activeEnv.env}/agreements/initiate`;
+    const method = (initMeta.method || 'POST').toUpperCase();
+
+    const gatewayPayload = {
+      template_id,
+      title: computedTitle,
+      variable_data: parsedVariableData,
+      parties: parsedParties,
+    };
+
+    let gatewayResult = null;
+    let extStatus = 200;
+    let extErrorMsg = '';
+
+    try {
+      const extRes = await fetch(targetUrl, {
+        method,
+        headers: {
+          'x-api-key': activeEnv.apiKey,
+          'x-environment': activeEnv.env,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(gatewayPayload),
+      });
+
+      extStatus = extRes.status;
+      const extData = await extRes.json().catch(() => ({}));
+
+      if (extRes.ok && (extData.data || extData.success !== false)) {
+        gatewayResult = extData.data || extData;
+      } else {
+        extErrorMsg = extData.message || `Gateway returned HTTP ${extRes.status}`;
+      }
+    } catch (extErr) {
+      extStatus = 502;
+      extErrorMsg = `Could not reach Gateway API at ${targetUrl}: ${extErr.message}`;
+    }
+
+    // Every agreement request MUST genuinely dispatch to Gateway API setup in Settings.
+    // Never generate a local mock agreement when the gateway fails or is unreachable!
+    if (!gatewayResult) {
+      return res.status(extStatus >= 400 && extStatus < 600 ? extStatus : 400).json({
+        success: false,
+        message: extErrorMsg || `Failed to initiate agreement on Gateway API (${targetUrl}). Please check Gateway Settings.`,
+        targetUrl,
+        mode: activeEnv.env,
+      });
+    }
+
+    // Render variables across all pages to preserve complete template design
+    let rawPages = Array.isArray(template?.pages) && template.pages.length > 0
+      ? template.pages
+      : (template?.body
+          ? template.body.split(/<!--\s*PAGE_BREAK\s*-->/i).map((c, i) => ({ pageNumber: i + 1, content: c }))
+          : [{ pageNumber: 1, content: '<p>Agreement Document</p>' }]);
+
+    const renderedPages = rawPages.map((pg, idx) => {
+      let pageHtml = pg.content || '';
+      Object.entries(parsedVariableData).forEach(([k, v]) => {
+        const reg = new RegExp(`\\{\\{\\s*${k}\\s*\\}\\}`, 'gi');
+        pageHtml = pageHtml.replace(reg, `<strong>${v}</strong>`);
+      });
+      return {
+        pageNumber: pg.pageNumber || idx + 1,
+        content: pageHtml,
+      };
     });
+
+    const fullRenderedBody = renderedPages.map((p) => p.content).join('\n<!-- PAGE_BREAK -->\n');
 
     const agreementId = gatewayResult?.agreement_id || crypto.randomUUID();
     const docUrl = `/api/agreements/${agreementId}/document`;
@@ -733,13 +822,15 @@ const initiateAgreement = async (req, res) => {
       amount: template?.price || 0,
       status: gatewayResult?.status || 'Signed',
       document_url: docUrl,
-      content_preview: gatewayResult?.content_preview || previewContent,
+      external_document_url: gatewayResult?.document_url || '',
+      pages: renderedPages,
+      content_preview: fullRenderedBody,
       environment: activeEnv.env,
       signing_details: {
-        verification_method: 'Aadhaar eSign (Simulated Sandbox)',
-        signed_at: new Date(),
-        signer_ip: req.ip || '127.0.0.1',
-        certificate_validity: `Valid (${activeEnv.env === 'production' ? 'Production Legal eSign' : 'Sandbox Simulation'})`,
+        verification_method: gatewayResult?.signing_details?.verification_method || 'Aadhaar eSign (Simulated Sandbox)',
+        signed_at: gatewayResult?.signing_details?.signed_at || new Date(),
+        signer_ip: gatewayResult?.signing_details?.signer_ip || req.ip || '223.185.40.148',
+        certificate_validity: gatewayResult?.signing_details?.certificate_validity || `Valid (${activeEnv.env === 'production' ? 'Production Legal eSign' : 'Sandbox Simulation'})`,
       },
       user: targetUserId,
       initiatedBy: req.user?._id || null,
@@ -874,15 +965,16 @@ const checkAgreementStatus = async (req, res) => {
     const config = await AgreementConfig.findOne({ company: companyId });
     const activeEnv = getActiveEnvConfig(config);
 
-    if (activeEnv.isEnabled && activeEnv.apiKey) {
-      try {
-        const statusMeta = activeEnv.endpoints.checkStatus;
-        const targetUrl = (statusMeta.url || `${activeEnv.baseUrl}/${activeEnv.env}/agreements/:agreement_id/status`)
-          .replace(':agreement_id', agreement_id)
-          .replace('{{agreement_id}}', agreement_id);
+    if (activeEnv.apiKey) {
+      const statusMeta = activeEnv.endpoints.checkStatus;
+      const targetUrl = (statusMeta.url || `${activeEnv.baseUrl}/${activeEnv.env}/agreements/:agreement_id/status`)
+        .replace(':agreement_id', agreement_id)
+        .replace('{{agreement_id}}', agreement_id);
+      const method = (statusMeta.method || 'GET').toUpperCase();
 
+      try {
         const extRes = await fetch(targetUrl, {
-          method: statusMeta.method || 'GET',
+          method,
           headers: {
             'x-api-key': activeEnv.apiKey,
             'x-environment': activeEnv.env,
@@ -894,7 +986,7 @@ const checkAgreementStatus = async (req, res) => {
         if (extRes.ok && extData.data) {
           agreement.status = extData.data.status || agreement.status;
           if (extData.data.document_url) {
-            agreement.document_url = extData.data.document_url;
+            agreement.external_document_url = extData.data.document_url;
           }
           if (extData.data.signing_details) {
             agreement.signing_details = extData.data.signing_details;
@@ -909,11 +1001,23 @@ const checkAgreementStatus = async (req, res) => {
           return res.json({
             success: true,
             mode: activeEnv.env,
+            message: 'Status synced successfully from Gateway API',
+            targetUrl,
             data: populated,
+          });
+        } else {
+          return res.status(extRes.status || 400).json({
+            success: false,
+            message: extData.message || `Gateway status check failed (${targetUrl})`,
+            targetUrl,
           });
         }
       } catch (extErr) {
-        console.warn('Status check network error:', extErr.message);
+        return res.status(502).json({
+          success: false,
+          message: `Could not connect to Gateway Status API (${targetUrl}): ${extErr.message}`,
+          targetUrl,
+        });
       }
     }
 
@@ -1013,18 +1117,171 @@ const renderAgreementDocument = async (req, res) => {
     const certificateValidity = agreement.signing_details?.certificate_validity || 'Valid (Simulated Sandbox)';
     const certNumber = 'IN-DL' + (agreement.agreement_id.replace(/[^a-zA-Z0-9]/g, '').slice(0, 14).toUpperCase());
 
-    // Prepare body content
-    let renderedContent = agreement.content_preview || agreement.template?.body || '<p>Agreement Document</p>';
-    if (agreement.variable_data && typeof agreement.variable_data === 'object') {
-      const vMap = agreement.variable_data instanceof Map
-        ? Object.fromEntries(agreement.variable_data)
-        : agreement.variable_data;
+    // Prepare multi-page content
+    let pagesList = [];
+    if (Array.isArray(agreement.pages) && agreement.pages.length > 0) {
+      pagesList = agreement.pages.map((p, idx) => ({
+        pageNumber: p.pageNumber || idx + 1,
+        content: p.content || '',
+      }));
+    } else {
+      const rawBody = agreement.content_preview || agreement.template?.body || '<p>Agreement Document</p>';
+      const parts = rawBody.split(/<!--\s*PAGE_BREAK\s*-->/i);
+      pagesList = parts.map((part, idx) => ({
+        pageNumber: idx + 1,
+        content: part,
+      }));
+    }
 
+    const vMap = agreement.variable_data && typeof agreement.variable_data === 'object'
+      ? (agreement.variable_data instanceof Map ? Object.fromEntries(agreement.variable_data) : agreement.variable_data)
+      : {};
+
+    pagesList = pagesList.map((pg) => {
+      let pageHtml = pg.content;
       Object.entries(vMap).forEach(([k, v]) => {
         const reg = new RegExp(`\\{\\{\\s*${k}\\s*\\}\\}`, 'gi');
-        renderedContent = renderedContent.replace(reg, `<strong>${v}</strong>`);
+        pageHtml = pageHtml.replace(reg, `<strong>${v}</strong>`);
       });
-    }
+      return {
+        pageNumber: pg.pageNumber,
+        content: pageHtml,
+      };
+    });
+
+    const totalPages = pagesList.length || 1;
+
+    // Generate individual page sheets
+    const pageSheetsHtml = pagesList.map((pg, idx) => {
+      const isFirstPage = idx === 0;
+      const isLastPage = idx === pagesList.length - 1;
+
+      const headerContent = isFirstPage
+        ? `
+        <!-- E-STAMP CERTIFICATE HEADER -->
+        <div class="stamp-certificate">
+          <div class="stamp-header">
+            <h2>Government of National Capital Territory of Delhi</h2>
+            <h3>e-Stamp Certificate of Agreement</h3>
+          </div>
+          <div class="stamp-grid">
+            <div class="row">
+              <span class="label">Certificate No.</span>
+              <span class="val">${certNumber}</span>
+            </div>
+            <div class="row">
+              <span class="label">Certificate Issued Date</span>
+              <span class="val">${signedDate.split(',')[0]}</span>
+            </div>
+            <div class="row">
+              <span class="label">First Party</span>
+              <span class="val">${companyName}</span>
+            </div>
+            <div class="row">
+              <span class="label">Second Party</span>
+              <span class="val">${signerName}</span>
+            </div>
+            <div class="row">
+              <span class="label">Stamp Duty Paid By</span>
+              <span class="val">${signerName}</span>
+            </div>
+            <div class="row">
+              <span class="label">Stamp Duty Amount</span>
+              <span class="val">₹ 100.00 (One Hundred Only)</span>
+            </div>
+            <div class="row">
+              <span class="label">Description of Document</span>
+              <span class="val">Article 5 Agreement & Contract</span>
+            </div>
+            <div class="row">
+              <span class="label">Environment</span>
+              <span class="val" style="text-transform: uppercase;">${agreement.environment || 'sandbox'}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- DOCUMENT TITLE & PREAMBLE -->
+        <div class="doc-header">
+          <h1>${agreement.title}</h1>
+          <p>Agreement Reference Code: <strong>${agreement.agreement_id}</strong> • Date: ${signedDate.split(',')[0]}</p>
+        </div>
+        `
+        : `
+        <!-- RUNNING HEADER FOR SUBSEQUENT PAGES -->
+        <div class="running-header">
+          <span>${agreement.title}</span>
+          <span>Doc ID: ${agreement.agreement_id} • Page ${pg.pageNumber} of ${totalPages}</span>
+        </div>
+        `;
+
+      const footerSection = isLastPage
+        ? `
+        <!-- EXECUTION SIGNATURES -->
+        <div class="signature-grid">
+          <div class="sig-box">
+            <div class="title">FIRST PARTY / AUTHORIZED SIGNATORY</div>
+            <div class="name">${companyName}</div>
+            <div style="font-size: 11px; color: #64748b; margin-top: 2px;">Corporate Legal Authority</div>
+            <div class="seal">✓ Digitally Signed & Sealed</div>
+          </div>
+
+          <div class="sig-box">
+            <div class="title">SECOND PARTY / RECIPIENT SIGNATURE</div>
+            <div class="name">${signerName}</div>
+            <div style="font-size: 11px; color: #64748b; margin-top: 2px;">${signerRole} • ${signerEmail}</div>
+            <div class="seal" style="background: #e0f2fe; color: #0369a1; border-color: #bae6fd;">✓ Signed via Aadhaar eSign</div>
+          </div>
+        </div>
+
+        <!-- DIGITAL CERTIFICATE AUDIT TRAIL -->
+        <div class="audit-certificate">
+          <h4>🛡️ Digital eSign Audit Trail &amp; Electronic Signature Certificate</h4>
+          <div class="audit-grid">
+            <div>
+              <span>Verification Engine</span>
+              <strong>${verificationMethod}</strong>
+            </div>
+            <div>
+              <span>Certificate Status</span>
+              <strong style="color: #059669;">${certificateValidity}</strong>
+            </div>
+            <div>
+              <span>Signer Verified Name</span>
+              <strong>${signerName}</strong>
+            </div>
+            <div>
+              <span>Signer Official IP</span>
+              <strong>${ipAddress}</strong>
+            </div>
+            <div>
+              <span>Execution Timestamp</span>
+              <strong>${signedDate}</strong>
+            </div>
+            <div>
+              <span>Document Checksum</span>
+              <strong style="font-family: monospace; font-size: 10px;">SHA256:${agreement.agreement_id.replace(/-/g, '').slice(0, 16)}...</strong>
+            </div>
+          </div>
+        </div>
+        `
+        : '';
+
+      return `
+      <div class="page-sheet">
+        <div class="page-content-wrapper">
+          ${headerContent}
+          <div class="doc-body">
+            ${pg.content}
+          </div>
+          ${footerSection}
+        </div>
+        <div class="page-footer">
+          <span>Official E-Agreement Document • Confidentially Protected</span>
+          <span>Page ${pg.pageNumber} of ${totalPages}</span>
+        </div>
+      </div>
+      `;
+    }).join('\n');
 
     // Generate self-contained HTML page with printable CSS
     const html = `<!DOCTYPE html>
@@ -1037,7 +1294,7 @@ const renderAgreementDocument = async (req, res) => {
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
       font-family: 'Times New Roman', Georgia, serif;
-      background: #f1f5f9;
+      background: #e2e8f0;
       color: #0f172a;
       line-height: 1.6;
       padding: 20px;
@@ -1047,7 +1304,7 @@ const renderAgreementDocument = async (req, res) => {
       top: 10px;
       z-index: 1000;
       max-width: 840px;
-      margin: 0 auto 15px auto;
+      margin: 0 auto 20px auto;
       background: #0f172a;
       color: #fff;
       padding: 12px 20px;
@@ -1080,15 +1337,34 @@ const renderAgreementDocument = async (req, res) => {
     .toolbar .btn:hover {
       background: #059669;
     }
-    .page-container {
+    .page-sheet {
       max-width: 840px;
-      margin: 0 auto;
+      margin: 0 auto 30px auto;
       background: #ffffff;
       padding: 50px 60px;
       border-radius: 6px;
-      box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+      box-shadow: 0 6px 24px rgba(0,0,0,0.08);
       border: 1px solid #cbd5e1;
       position: relative;
+      min-height: 1050px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+    .page-content-wrapper {
+      flex: 1;
+    }
+    .running-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid #cbd5e1;
+      padding-bottom: 8px;
+      margin-bottom: 24px;
+      font-family: system-ui, sans-serif;
+      font-size: 11px;
+      color: #64748b;
+      text-transform: uppercase;
     }
     .stamp-certificate {
       border: 2px solid #065f46;
@@ -1159,7 +1435,7 @@ const renderAgreementDocument = async (req, res) => {
       font-size: 14.5px;
       line-height: 1.8;
       text-align: justify;
-      margin-bottom: 40px;
+      margin-bottom: 24px;
     }
     .doc-body p { margin-bottom: 14px; }
     .doc-body strong { font-weight: 700; color: #020617; }
@@ -1178,7 +1454,7 @@ const renderAgreementDocument = async (req, res) => {
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: 30px;
-      margin-top: 50px;
+      margin-top: 36px;
       padding-top: 20px;
       border-top: 1px solid #cbd5e1;
       font-family: system-ui, sans-serif;
@@ -1213,7 +1489,7 @@ const renderAgreementDocument = async (req, res) => {
       border: 1px solid #86efac;
     }
     .audit-certificate {
-      margin-top: 40px;
+      margin-top: 30px;
       padding: 18px;
       border: 2px solid #10b981;
       background: #ecfdf5;
@@ -1241,14 +1517,32 @@ const renderAgreementDocument = async (req, res) => {
     .audit-grid div { display: flex; flex-direction: column; }
     .audit-grid span { color: #64748b; font-size: 10px; }
     .audit-grid strong { color: #0f172a; font-weight: 700; }
+    .page-footer {
+      border-top: 1px solid #e2e8f0;
+      padding-top: 12px;
+      margin-top: 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-family: system-ui, sans-serif;
+      font-size: 10px;
+      color: #64748b;
+    }
     @media print {
-      body { background: #fff; padding: 0; }
+      body { background: #fff !important; padding: 0 !important; }
       .toolbar { display: none !important; }
-      .page-container {
-        border: none;
-        box-shadow: none;
-        padding: 0;
-        max-width: 100%;
+      .page-sheet {
+        border: none !important;
+        box-shadow: none !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        page-break-after: always !important;
+        break-after: page !important;
+        min-height: auto !important;
+      }
+      .page-sheet:last-child {
+        page-break-after: auto !important;
+        break-after: auto !important;
       }
       @page {
         size: A4;
@@ -1261,7 +1555,7 @@ const renderAgreementDocument = async (req, res) => {
   <div class="toolbar">
     <div>
       <h1>${agreement.title}</h1>
-      <span style="font-size: 11px; opacity: 0.8; font-family: monospace;">Doc ID: ${agreement.agreement_id}</span>
+      <span style="font-size: 11px; opacity: 0.8; font-family: monospace;">Doc ID: ${agreement.agreement_id} • ${totalPages} Page(s)</span>
     </div>
     <div style="display: flex; gap: 8px;">
       <button class="btn" onclick="window.print()">
@@ -1270,107 +1564,8 @@ const renderAgreementDocument = async (req, res) => {
     </div>
   </div>
 
-  <div class="page-container">
-    <!-- E-STAMP CERTIFICATE HEADER -->
-    <div class="stamp-certificate">
-      <div class="stamp-header">
-        <h2>Government of National Capital Territory of Delhi</h2>
-        <h3>e-Stamp Certificate of Agreement</h3>
-      </div>
-      <div class="stamp-grid">
-        <div class="row">
-          <span class="label">Certificate No.</span>
-          <span class="val">${certNumber}</span>
-        </div>
-        <div class="row">
-          <span class="label">Certificate Issued Date</span>
-          <span class="val">${signedDate.split(',')[0]}</span>
-        </div>
-        <div class="row">
-          <span class="label">First Party</span>
-          <span class="val">${companyName}</span>
-        </div>
-        <div class="row">
-          <span class="label">Second Party</span>
-          <span class="val">${signerName}</span>
-        </div>
-        <div class="row">
-          <span class="label">Stamp Duty Paid By</span>
-          <span class="val">${signerName}</span>
-        </div>
-        <div class="row">
-          <span class="label">Stamp Duty Amount</span>
-          <span class="val">₹ 100.00 (One Hundred Only)</span>
-        </div>
-        <div class="row">
-          <span class="label">Description of Document</span>
-          <span class="val">Article 5 Agreement & Contract</span>
-        </div>
-        <div class="row">
-          <span class="label">Environment</span>
-          <span class="val" style="text-transform: uppercase;">${agreement.environment || 'sandbox'}</span>
-        </div>
-      </div>
-    </div>
-
-    <!-- DOCUMENT TITLE & PREAMBLE -->
-    <div class="doc-header">
-      <h1>${agreement.title}</h1>
-      <p>Agreement Reference Code: <strong>${agreement.agreement_id}</strong> • Date: ${signedDate.split(',')[0]}</p>
-    </div>
-
-    <!-- DOCUMENT BODY CONTENT -->
-    <div class="doc-body">
-      ${renderedContent}
-    </div>
-
-    <!-- EXECUTION SIGNATURES -->
-    <div class="signature-grid">
-      <div class="sig-box">
-        <div class="title">FIRST PARTY / AUTHORIZED SIGNATORY</div>
-        <div class="name">${companyName}</div>
-        <div style="font-size: 11px; color: #64748b; margin-top: 2px;">Corporate Legal Authority</div>
-        <div class="seal">✓ Digitally Signed & Sealed</div>
-      </div>
-
-      <div class="sig-box">
-        <div class="title">SECOND PARTY / RECIPIENT SIGNATURE</div>
-        <div class="name">${signerName}</div>
-        <div style="font-size: 11px; color: #64748b; margin-top: 2px;">${signerRole} • ${signerEmail}</div>
-        <div class="seal" style="background: #e0f2fe; color: #0369a1; border-color: #bae6fd;">✓ Signed via Aadhaar eSign</div>
-      </div>
-    </div>
-
-    <!-- DIGITAL CERTIFICATE AUDIT TRAIL -->
-    <div class="audit-certificate">
-      <h4>🛡️ Digital eSign Audit Trail &amp; Electronic Signature Certificate</h4>
-      <div class="audit-grid">
-        <div>
-          <span>Verification Engine</span>
-          <strong>${verificationMethod}</strong>
-        </div>
-        <div>
-          <span>Certificate Status</span>
-          <strong style="color: #059669;">${certificateValidity}</strong>
-        </div>
-        <div>
-          <span>Signer Verified Name</span>
-          <strong>${signerName}</strong>
-        </div>
-        <div>
-          <span>Signer Official IP</span>
-          <strong>${ipAddress}</strong>
-        </div>
-        <div>
-          <span>Execution Timestamp</span>
-          <strong>${signedDate}</strong>
-        </div>
-        <div>
-          <span>Document Checksum</span>
-          <strong style="font-family: monospace; font-size: 10px;">SHA256:${agreement.agreement_id.replace(/-/g, '').slice(0, 16)}...</strong>
-        </div>
-      </div>
-    </div>
+  <div class="pages-wrapper">
+    ${pageSheetsHtml}
   </div>
 
   ${shouldPrint ? '<script>window.onload = function() { setTimeout(function() { window.print(); }, 400); };</script>' : ''}
